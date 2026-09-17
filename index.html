@@ -799,6 +799,15 @@
           </select>
         </div>
         <div class="tdd-field full">
+          <label>is this a reversal-candle trade (hammer, doji, engulfing, etc.)? if yes — has a genuine trend already happened, not a range?</label>
+          <select id="f-reversal-trend-check">
+            <option value="na">Not a reversal-candle trade</option>
+            <option value="confirmed">Yes — clear uptrend/downtrend behind it, market is not ranging</option>
+            <option value="invalid">No — market is ranging, no real trend behind this candle</option>
+            <option value="not-checked">Haven't checked</option>
+          </select>
+        </div>
+        <div class="tdd-field full">
           <label>is there a chart pattern forming (rising/falling wedge, flag, HH/HL, triangle, H&amp;S, etc.)?</label>
           <select id="f-chart-pattern">
             <option value="none">No obvious pattern forming</option>
@@ -1560,7 +1569,7 @@
   // Fill in your own project's config (Firebase console → Project settings → General → Your apps → SDK setup).
   // This is a public client config, not a secret — real protection comes from the Realtime Database
   // security rules (see FIREBASE_SETUP.md), which restrict each account to its own "positions/<uid>" node.
- const firebaseConfig = {
+const firebaseConfig = {
   apiKey: "AIzaSyAb2s0CBOVR8DBhlCVPJZpQ21XMZh_fIh0",
   authDomain: "trading-dashboard-be05e.firebaseapp.com",
   databaseURL: "https://trading-dashboard-be05e-default-rtdb.firebaseio.com",
@@ -1733,6 +1742,7 @@
     const setup = $('#f-setup').value;
     const retest = $('#f-retest').value;
     const rangeCheck = $('#f-range-check').value;
+    const reversalTrendCheck = $('#f-reversal-trend-check').value;
     const chartPattern = $('#f-chart-pattern').value;
 
     const reds = [], ambers = [];
@@ -1749,6 +1759,8 @@
     if (candleClosed === 'no') reds.push("The candle hasn't actually closed yet. This is exactly what cost you most of your capital — wait for the close before treating it as a confirmed reversal candle.");
     if (goodLevel === 'no') reds.push("You flagged this level as weak or unproven. A drawn line isn't the same thing as a respected level — don't trade it until it actually is one.");
     if (rangeCheck === 'not-checked') reds.push("You haven't checked whether this is a range on a longer timeframe. Trading a breakout/reversal signal inside an unmarked range is a common way ranges fake you out — mark the longer-timeframe support/resistance first.");
+    if (reversalTrendCheck === 'invalid') reds.push("You flagged the market as ranging with no real trend behind this candle. A hammer, doji, or engulfing pattern needs a genuine prior trend to reverse — the same shape in a range is close to meaningless.");
+    if (reversalTrendCheck === 'not-checked') reds.push("You haven't checked whether a genuine trend actually preceded this reversal candle. Check the longer timeframe before treating the shape as a signal.");
     if (chartPattern === 'yes-not-planned') ambers.push("You've spotted a chart pattern but haven't set target/stop from its own structure yet — a wedge, flag, or head-and-shoulders each imply their own measured-move target and invalidation point. Use it instead of guessing.");
     if (retest === 'failed') reds.push("You flagged the confirmation as failed — that's a trap, not a setup. Do not enter.");
     if (retest === 'chasing') ambers.push("Confirmation hasn't happened yet — you're entering on the shape alone. Lower probability, wider real risk than it looks.");
@@ -1769,7 +1781,7 @@
       v.innerHTML = '<span class="lead">Structure, risk and stop-loss are in place</span>This still isn\'t a guarantee — it just means you\'re not defeating yourself before the trade even starts.';
     }
   }
-  ['#f-sl','#f-risk','#f-leverage','#f-setup','#f-retest','#f-target','#f-entry','#f-range-check','#f-chart-pattern'].forEach(sel => $(sel).addEventListener('input', () => { computeRR(); computeVerdict(); }));
+  ['#f-sl','#f-risk','#f-leverage','#f-setup','#f-retest','#f-target','#f-entry','#f-range-check','#f-chart-pattern','#f-reversal-trend-check'].forEach(sel => $(sel).addEventListener('input', () => { computeRR(); computeVerdict(); }));
   $$('input[name="f-bias"]').forEach(r => r.addEventListener('change', computeVerdict));
   ['#f-mark-support','#f-mark-resistance','#f-mark-trendline'].forEach(sel => $(sel).addEventListener('change', computeVerdict));
   $$('input[name="f-daily"]').forEach(r => r.addEventListener('change', computeVerdict));
@@ -1798,6 +1810,7 @@
       risk: $('#f-risk').value,
       retest: $('#f-retest').value,
       rangeCheck: $('#f-range-check').value,
+      reversalTrendCheck: $('#f-reversal-trend-check').value,
       chartPattern: $('#f-chart-pattern').value,
       bigWin: $('#f-bigwin').checked,
       marksDrawn: marksDrawn,
@@ -1822,6 +1835,7 @@
     $('#f-mark-trendline').checked = false;
     $('#f-retest').value = 'na';
     $('#f-range-check').value = 'not-checked';
+    $('#f-reversal-trend-check').value = 'na';
     $('#f-chart-pattern').value = 'none';
     $('#f-bigwin').checked = false;
     $('#f-setup').value = '';
@@ -1867,6 +1881,9 @@
   function rangeCheckLabel(r) {
     return {'not-checked':'NOT CHECKED', 'trending':'trending, not a range', 'range-marked':'range, marked'}[r] || r;
   }
+  function reversalTrendCheckLabel(r) {
+    return {'na':'n/a', 'confirmed':'genuine trend confirmed', 'invalid':'RANGING — no real trend', 'not-checked':'NOT CHECKED'}[r] || r;
+  }
   function chartPatternLabel(r) {
     return {'none':'none noted', 'yes-planned':'pattern noted, target/stop planned', 'yes-not-planned':'pattern noted, target/stop NOT planned'}[r] || r;
   }
@@ -1886,7 +1903,7 @@
         '<div><span class="outcome ' + outcomeClass(e.outcome) + '">' + outcomeLabel(e.outcome) + (e.bigWin ? ' · BIG WIN' : '') + '</span></div></div>' +
         '<div class="when" style="margin-top:6px;">setup: ' + e.setup + ' · risk ' + (e.risk||'—') + '% · leverage ' + (e.leverage||'—') + 'x · SL ' + (e.sl || 'NONE SET') + ' · target ' + (e.target || 'NONE SET') + (e.rr ? ' · R:R ' + e.rr : '') + '</div>' +
         '<div class="when" style="margin-top:2px;">marked: ' + ((e.marksDrawn && e.marksDrawn.length) ? e.marksDrawn.join(', ') : 'nothing marked') + (e.retest && e.retest !== 'na' ? ' · confirmation: ' + retestLabel(e.retest) : '') + '</div>' +
-        (e.rangeCheck || e.chartPattern ? '<div class="when" style="margin-top:2px;">' + (e.rangeCheck ? 'range check: ' + rangeCheckLabel(e.rangeCheck) : '') + (e.rangeCheck && e.chartPattern ? ' · ' : '') + (e.chartPattern ? 'pattern: ' + chartPatternLabel(e.chartPattern) : '') + '</div>' : '') +
+        (e.rangeCheck || e.chartPattern || e.reversalTrendCheck ? '<div class="when" style="margin-top:2px;">' + (e.rangeCheck ? 'range check: ' + rangeCheckLabel(e.rangeCheck) : '') + (e.rangeCheck && (e.chartPattern || e.reversalTrendCheck) ? ' · ' : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' ? 'reversal trend: ' + reversalTrendCheckLabel(e.reversalTrendCheck) : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' && e.chartPattern ? ' · ' : '') + (e.chartPattern ? 'pattern: ' + chartPatternLabel(e.chartPattern) : '') + '</div>' : '') +
         (e.candleClosed === 'no' || e.goodLevel === 'no' ? '<div class="when" style="margin-top:2px; color:var(--rust);">' + (e.candleClosed === 'no' ? 'entered before candle closed' : '') + (e.candleClosed === 'no' && e.goodLevel === 'no' ? ' · ' : '') + (e.goodLevel === 'no' ? 'weak/unproven level' : '') + '</div>' : '') +
         (e.mistakes.length ? '<div class="tdd-pill-row">' + e.mistakes.map(m => '<span class="tdd-pill">' + m + '</span>').join('') + '</div>' : '') +
         (e.notes ? '<div class="note">' + e.notes + '</div>' : '') +
