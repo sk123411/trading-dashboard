@@ -533,6 +533,34 @@
 
     <!-- STRUCTURE -->
     <div class="tdd-panel" id="panel-structure">
+      <h1 class="tdd-h1">The highway analogy — the mental model for everything below</h1>
+      <p class="tdd-sub">One picture that ties the whole tab together: structure is the road, candles are the traffic. Keep this in your head as you read everything else here.</p>
+
+      <div class="tdd-mistake-grid" style="margin-bottom:20px;">
+        <div class="tdd-mistake" style="border-left-color:var(--amber);"><div class="num" style="color:var(--amber);">🛣️ THE ROAD</div><div class="txt">Support and resistance are the permanent highways and barriers built into the landscape. A major resistance is a roadblock or dead end — it stops the flow. A major support is a wide-open, freshly paved lane — cars accelerate through it easily.</div></div>
+        <div class="tdd-mistake" style="border-left-color:var(--amber);"><div class="num" style="color:var(--amber);">🚗 THE TRAFFIC</div><div class="txt">Candlesticks are the temporary cars, jams, and speed bursts moving on that road. A massive bullish candle is a sports car flooring it down an open stretch. A cluster of small, messy candles is rush-hour traffic — nobody actually getting anywhere. A jam on the 5-minute chart can clear completely within the hour.</div></div>
+      </div>
+
+      <div class="tdd-card" style="border-left:2px solid var(--rust); margin-bottom:20px;">
+        <p><b style="color:var(--text)">The one rule this analogy is really teaching:</b> the road decides where the cars can go — never the other way around. A car doesn't get to un-build a roadblock just by driving at it fast. Every extension below is the same lesson, applied to a different piece of the chart.</p>
+      </div>
+
+      <div class="tdd-section-label">extending the analogy to everything else on this dashboard</div>
+      <div class="tdd-mistake-grid" style="margin-bottom:20px;">
+        <div class="tdd-mistake"><div class="num">🚧 LIQUIDITY SWEEP</div><div class="txt">The fake exit ramp. Looks like a shortcut off the highway, tempts drivers to swerve off early — but it's a dead end that dumps them right back onto the road. That's a stop-hunt wick reversing immediately after it triggers.</div></div>
+        <div class="tdd-mistake"><div class="num">🛑 RETEST</div><div class="txt">Checking the wreckage. Even after a roadblock is demolished, cars slow down and glance at the rubble before flooring it through — that pause is the retest, not doubt that the road is actually open.</div></div>
+        <div class="tdd-mistake"><div class="num">🕳️ FVG (FAIR VALUE GAP)</div><div class="txt">The overnight paving gap. A stretch of road built so fast overnight that no real traffic has driven it yet — drivers instinctively loop back to actually use that untouched stretch before continuing.</div></div>
+        <div class="tdd-mistake"><div class="num">🚦 PATIENCE / CONFIRMATION</div><div class="txt">The red light. You don't get to floor it just because the road ahead looks clear — you wait for the green light (the confirming candle), or you risk a collision.</div></div>
+        <div class="tdd-mistake"><div class="num">🔄 ROLE REVERSAL (S/R FLIP)</div><div class="txt">The barrier gets rebuilt on the other side. Tear down a wall blocking northbound traffic, and the rubble becomes the new guardrail blocking southbound traffic at the exact same spot.</div></div>
+        <div class="tdd-mistake"><div class="num">🚘 VOLUME</div><div class="txt">How many cars are actually moving. One lone car speeding down an empty road proves nothing. A full, fast-moving convoy is the real signal that the road is genuinely clear.</div></div>
+        <div class="tdd-mistake"><div class="num">🌀 RANGE</div><div class="txt">The roundabout. Cars just loop around and around between two barriers, going nowhere — until one barrier finally gives way and traffic actually escapes in a direction.</div></div>
+        <div class="tdd-mistake"><div class="num">🛰️ HIGHER TIMEFRAME</div><div class="txt">The satellite view. Your side-street alley (lower timeframe) might dead-end straight into a highway wall you can't see from street level — only the satellite view shows you that wall coming in time.</div></div>
+        <div class="tdd-mistake"><div class="num">🏗️ SMART MONEY</div><div class="txt">The construction crew. They built the road, know exactly where every barrier and off-ramp sits, and profit from the tolls and pile-ups at predictable choke points — while everyday drivers just react to whatever's directly in front of their bumper.</div></div>
+        <div class="tdd-mistake"><div class="num">🔀 REVERSAL CANDLE, NO TREND</div><div class="txt">A U-turn in an empty parking lot. A U-turn only means something as a "reversal" if the car was actually driving somewhere first — a U-turn sitting still in a lot (a range) isn't a reversal of anything.</div></div>
+        <div class="tdd-mistake"><div class="num">📈 TREND (UP/DOWN)</div><div class="txt">The highway's grade. An uptrend is downhill for the cars — they accelerate with gravity doing the work. A downtrend is uphill — every inch of progress costs real effort, and momentum stalls fast the moment the push stops.</div></div>
+        <div class="tdd-mistake"><div class="num">📐 TRENDLINE</div><div class="txt">The road's curve. A trendline is the bend the highway is actually following — one touch is just a car following the curve; a genuine break is the road itself changing direction, not a car swerving off it.</div></div>
+      </div>
+
       <h1 class="tdd-h1">Market structure, in the order you should check it</h1>
       <p class="tdd-sub">Top-down, every time. If step 1 hasn't changed, nothing on a lower timeframe overrides it.</p>
       <div class="tdd-pattern-grid">
@@ -912,6 +940,10 @@
 
 <script>
 (function(){
+  const root = document.currentScript.previousElementSibling.parentElement;
+  const $ = (sel, ctx) => (ctx||root).querySelector(sel);
+  const $$ = (sel, ctx) => Array.from((ctx||root).querySelectorAll(sel));
+
   const MISTAKES = [
     "Ignored higher-timeframe support/resistance still intact",
     "Traded on bias, not on confirmed structure",
@@ -1065,10 +1097,6 @@
       expect:"A bullish continuation pattern — breakout above the cup's rim, confirmed once the handle's high is cleared.",
       smart:"The handle is frequently the last shakeout — a small dip that removes late impatient longs right before the level finally clears with real follow-through."}
   ];
-
-  const root = document.currentScript.previousElementSibling.parentElement;
-  const $ = (sel, ctx) => (ctx||root).querySelector(sel);
-  const $$ = (sel, ctx) => Array.from((ctx||root).querySelectorAll(sel));
 
   // --- tabs ---
   function goTab(tab) {
