@@ -1622,7 +1622,10 @@ const firebaseConfig = {
   function snapshotToEntries(val) {
     if (!val) return [];
     return Object.keys(val)
-      .map(k => Object.assign({ id: k }, val[k]))
+      // Firebase RTDB silently drops keys whose value is an empty array/object (e.g. a clean
+      // trade with no mistakes checked), so `mistakes`/`marksDrawn` can come back as undefined.
+      // Default them here so rendering never crashes on a missing field.
+      .map(k => Object.assign({ id: k, mistakes: [], marksDrawn: [] }, val[k]))
       .sort((a, b) => b.id.localeCompare(a.id)); // Firebase push keys sort chronologically — newest first
   }
 
@@ -1925,6 +1928,7 @@ const firebaseConfig = {
       return;
     }
     if (!entries.length) { el.innerHTML = '<div class="tdd-empty">No trades logged yet. Log your first one from "New trade / checklist".</div>'; return; }
+    try {
     el.innerHTML = entries.map(e => (
       '<div class="tdd-entry" data-id="' + e.id + '">' +
         '<div class="row1"><div><span class="who">' + e.symbol + ' — ' + e.direction + '</span> <span class="when">' + e.date + '</span></div>' +
@@ -1946,6 +1950,9 @@ const firebaseConfig = {
       catch(e) { alert('Could not delete: ' + (e.message || e)); }
     }));
     $$('.tdd-ref-zoom', el).forEach(img => img.addEventListener('click', () => openLightbox(img.src)));
+    } catch(err) {
+      el.innerHTML = '<div class="tdd-empty">Could not display your journal (data error): ' + (err.message || err) + '</div>';
+    }
   }
 
   function openLightbox(src) {
