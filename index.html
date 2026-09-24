@@ -366,8 +366,15 @@
 
   <!-- IMAGE LIGHTBOX -->
   <div class="tdd-modal-backdrop hidden" id="tdd-lightbox">
-    <button class="tdd-modal-close" id="tdd-lightbox-close" style="position:fixed; top:20px; right:24px; font-size:30px; color:#fff;">&times;</button>
-    <img id="tdd-lightbox-img" src="" alt="reference chart, zoomed" style="max-width:92vw; max-height:92vh; border-radius:4px; box-shadow:0 8px 40px rgba(0,0,0,0.6); cursor:zoom-out;">
+    <button class="tdd-modal-close" id="tdd-lightbox-close" style="position:fixed; top:20px; right:24px; font-size:30px; color:#fff; z-index:2;">&times;</button>
+    <div id="tdd-lightbox-viewport" style="position:relative; width:92vw; height:92vh; overflow:hidden; display:flex; align-items:center; justify-content:center;">
+      <img id="tdd-lightbox-img" src="" alt="reference chart, zoomed" style="max-width:92vw; max-height:92vh; border-radius:4px; box-shadow:0 8px 40px rgba(0,0,0,0.6); cursor:zoom-in; user-select:none; touch-action:none;">
+    </div>
+    <div style="position:fixed; bottom:24px; left:50%; transform:translateX(-50%); display:flex; gap:8px; z-index:2;">
+      <button class="tdd-btn ghost small" id="tdd-zoom-out" type="button">−</button>
+      <button class="tdd-btn ghost small" id="tdd-zoom-reset" type="button">reset</button>
+      <button class="tdd-btn ghost small" id="tdd-zoom-in" type="button">+</button>
+    </div>
   </div>
 
   <div class="tdd-sidebar">
@@ -911,7 +918,9 @@
 
       <div class="tdd-verdict v-green" id="tdd-verdict"></div>
 
+      <div id="tdd-editing-banner" style="display:none; margin-bottom:10px; padding:10px 14px; border:1px solid var(--amber); border-radius:4px; color:var(--amber); font-size:13px;">Editing an existing trade — saving will update this entry instead of creating a new one.</div>
       <button class="tdd-btn" id="tdd-save">Save entry to journal</button>
+      <button class="tdd-btn ghost" id="tdd-cancel-edit" type="button" style="display:none; margin-left:8px;">Cancel edit</button>
     </div>
 
     <!-- JOURNAL -->
@@ -1106,7 +1115,10 @@
     $('#panel-' + tab).classList.add('active');
     if (tab === 'livechart') ensureChartLoaded();
   }
-  $$('.tdd-navbtn').forEach(btn => btn.addEventListener('click', () => goTab(btn.dataset.tab)));
+  $$('.tdd-navbtn').forEach(btn => btn.addEventListener('click', () => {
+    if (btn.dataset.tab === 'log' && editingId) resetForm();
+    goTab(btn.dataset.tab);
+  }));
   $$('[data-goto]').forEach(btn => btn.addEventListener('click', () => goTab(btn.dataset.goto)));
 
   // --- TradingView live chart (embedded iframe — stays inside this page, no new tab) ---
@@ -1556,6 +1568,7 @@
   let entries = [];
   let refImageDataUrl = null;
   let streakRef = null;
+  let editingId = null;
 
   function computeStreakFromDates(dateKeys) {
     const set = new Set(dateKeys);
@@ -1597,7 +1610,7 @@
   // Fill in your own project's config (Firebase console → Project settings → General → Your apps → SDK setup).
   // This is a public client config, not a secret — real protection comes from the Realtime Database
   // security rules (see FIREBASE_SETUP.md), which restrict each account to its own "positions/<uid>" node.
-const firebaseConfig = {
+ const firebaseConfig = {
   apiKey: "AIzaSyAb2s0CBOVR8DBhlCVPJZpQ21XMZh_fIh0",
   authDomain: "trading-dashboard-be05e.firebaseapp.com",
   databaseURL: "https://trading-dashboard-be05e-default-rtdb.firebaseio.com",
@@ -1854,12 +1867,25 @@ const firebaseConfig = {
       notes: $('#f-notes').value,
       createdAt: Date.now()
     };
-    if (refImageDataUrl) entry.referenceImage = refImageDataUrl;
+    entry.referenceImage = refImageDataUrl || null; // explicit null so editing can clear a previously-saved image
     return entry;
   }
 
+  function setEditModeUI(isEditing) {
+    $('#tdd-save').textContent = isEditing ? 'Update entry' : 'Save entry to journal';
+    $('#tdd-editing-banner').style.display = isEditing ? 'block' : 'none';
+    $('#tdd-cancel-edit').style.display = isEditing ? 'inline-block' : 'none';
+  }
+
   function resetForm() {
+    editingId = null;
+    $('#f-date').value = new Date().toISOString().slice(0,10);
     $('#f-symbol').value=''; $('#f-entry').value=''; $('#f-sl').value=''; $('#f-target').value=''; $('#f-rr').value=''; $('#f-notes').value='';
+    $('#f-direction').value = 'Long';
+    $('#f-htf').value = 'up';
+    $('#f-leverage').value = '1';
+    $('#f-risk').value = '1';
+    $('#f-outcome').value = 'open';
     $$('#tdd-mistake-checks input').forEach(c => c.checked = false);
     $('#f-mark-support').checked = false;
     $('#f-mark-resistance').checked = false;
@@ -1874,16 +1900,76 @@ const firebaseConfig = {
     $('#f-refimage-preview').style.display = 'none';
     refImageDataUrl = null;
     $$('input[name="f-bias"]').forEach(r => r.checked = (r.value==='no'));
+    $$('input[name="f-daily"]').forEach(r => r.checked = (r.value==='yes'));
     $$('input[name="f-candleclosed"]').forEach(r => r.checked = (r.value==='yes'));
     $$('input[name="f-goodlevel"]').forEach(r => r.checked = (r.value==='yes'));
+    setEditModeUI(false);
     computeVerdict();
+  }
+
+  function populateFormFromEntry(e) {
+    $('#f-date').value = e.date || new Date().toISOString().slice(0,10);
+    $('#f-symbol').value = (e.symbol && e.symbol !== '—') ? e.symbol : '';
+    $('#f-direction').value = e.direction || 'Long';
+    $('#f-htf').value = e.htf || 'up';
+    $('#f-setup').value = (e.setup && e.setup !== 'None (forced trade)') ? e.setup : '';
+    $('#f-leverage').value = e.leverage || '1';
+    $('#f-entry').value = e.entry || '';
+    $('#f-sl').value = e.sl || '';
+    $('#f-target').value = e.target || '';
+    $('#f-risk').value = e.risk || '1';
+    $('#f-outcome').value = e.outcome || 'open';
+    $('#f-range-check').value = e.rangeCheck || 'not-checked';
+    $('#f-reversal-trend-check').value = e.reversalTrendCheck || 'na';
+    $('#f-chart-pattern').value = e.chartPattern || 'none';
+    $('#f-retest').value = e.retest || 'na';
+    $('#f-bigwin').checked = !!e.bigWin;
+    const marks = e.marksDrawn || [];
+    $('#f-mark-support').checked = marks.includes('support');
+    $('#f-mark-resistance').checked = marks.includes('resistance');
+    $('#f-mark-trendline').checked = marks.includes('trendline');
+    $$('input[name="f-daily"]').forEach(r => r.checked = (r.value === (e.daily || 'yes')));
+    $$('input[name="f-candleclosed"]').forEach(r => r.checked = (r.value === (e.candleClosed || 'yes')));
+    $$('input[name="f-goodlevel"]').forEach(r => r.checked = (r.value === (e.goodLevel || 'yes')));
+    $$('input[name="f-bias"]').forEach(r => r.checked = (r.value === (e.bias || 'no')));
+    const mistakesSet = new Set(e.mistakes || []);
+    $$('#tdd-mistake-checks input').forEach(c => { c.checked = mistakesSet.has(MISTAKES[parseInt(c.value)]); });
+    $('#f-notes').value = e.notes || '';
+    if (e.referenceImage) {
+      refImageDataUrl = e.referenceImage;
+      $('#f-refimage-thumb').src = e.referenceImage;
+      $('#f-refimage-preview').style.display = 'flex';
+    } else {
+      refImageDataUrl = null;
+      $('#f-refimage-preview').style.display = 'none';
+    }
+    $('#f-refimage').value = '';
+    computeRR();
+    computeVerdict();
+  }
+
+  function editEntry(id) {
+    const entry = entries.find(x => x.id === id);
+    if (!entry) return;
+    populateFormFromEntry(entry);
+    editingId = id;
+    setEditModeUI(true);
+    goTab('log');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function doSaveEntry() {
     if (!currentUser || !db) return;
     const entry = buildEntryFromForm();
     try {
-      await db.ref('positions/' + currentUser.uid).push(entry);
+      if (editingId) {
+        const original = entries.find(x => x.id === editingId);
+        if (original && original.createdAt) entry.createdAt = original.createdAt;
+        entry.updatedAt = Date.now();
+        await db.ref('positions/' + currentUser.uid + '/' + editingId).update(entry);
+      } else {
+        await db.ref('positions/' + currentUser.uid).push(entry);
+      }
       resetForm();
       goTab('journal');
     } catch(e) {
@@ -1899,6 +1985,7 @@ const firebaseConfig = {
     }
     doSaveEntry();
   });
+  $('#tdd-cancel-edit').addEventListener('click', resetForm);
 
   function outcomeClass(o) {
     return o === 'win' ? 'o-win' : o === 'loss' ? 'o-loss' : o === 'liquidated' ? 'o-liq' : o === 'breakeven' ? 'o-win' : 'o-open';
@@ -1930,7 +2017,7 @@ const firebaseConfig = {
     if (!entries.length) { el.innerHTML = '<div class="tdd-empty">No trades logged yet. Log your first one from "New trade / checklist".</div>'; return; }
     try {
     el.innerHTML = entries.map(e => (
-      '<div class="tdd-entry" data-id="' + e.id + '">' +
+      '<div class="tdd-entry" data-id="' + e.id + '" style="cursor:pointer;" title="Click to edit this trade">' +
         '<div class="row1"><div><span class="who">' + e.symbol + ' — ' + e.direction + '</span> <span class="when">' + e.date + '</span></div>' +
         '<div><span class="outcome ' + outcomeClass(e.outcome) + '">' + outcomeLabel(e.outcome) + (e.bigWin ? ' · BIG WIN' : '') + '</span></div></div>' +
         '<div class="when" style="margin-top:6px;">setup: ' + e.setup + ' · risk ' + (e.risk||'—') + '% · leverage ' + (e.leverage||'—') + 'x · SL ' + (e.sl || 'NONE SET') + ' · target ' + (e.target || 'NONE SET') + (e.rr ? ' · R:R ' + e.rr : '') + '</div>' +
@@ -1944,29 +2031,122 @@ const firebaseConfig = {
       '</div>'
     )).join('');
     $$('.del', el).forEach(btn => btn.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
       if (!currentUser || !db) return;
       const key = ev.target.dataset.del;
       try { await db.ref('positions/' + currentUser.uid + '/' + key).remove(); }
       catch(e) { alert('Could not delete: ' + (e.message || e)); }
     }));
-    $$('.tdd-ref-zoom', el).forEach(img => img.addEventListener('click', () => openLightbox(img.src)));
+    $$('.tdd-ref-zoom', el).forEach(img => img.addEventListener('click', (ev) => { ev.stopPropagation(); openLightbox(img.src); }));
+    $$('.tdd-entry', el).forEach(card => card.addEventListener('click', () => editEntry(card.dataset.id)));
     } catch(err) {
       el.innerHTML = '<div class="tdd-empty">Could not display your journal (data error): ' + (err.message || err) + '</div>';
     }
   }
 
+  // --- image lightbox: click/wheel to zoom, drag or pinch to pan ---
+  let lbScale = 1, lbX = 0, lbY = 0, lbPanning = false, lbPanStartX = 0, lbPanStartY = 0, lbMoved = false;
+  let lbPinchDist = null;
+  const LB_MIN = 1, LB_MAX = 5;
+
+  function lbApply() {
+    const img = $('#tdd-lightbox-img');
+    img.style.transform = 'translate(' + lbX + 'px,' + lbY + 'px) scale(' + lbScale + ')';
+    img.style.cursor = lbScale > 1 ? 'grab' : 'zoom-in';
+  }
+  function lbReset() { lbScale = 1; lbX = 0; lbY = 0; lbApply(); }
+  function lbClamp(s) { return Math.min(LB_MAX, Math.max(LB_MIN, s)); }
+  function lbZoomAt(clientX, clientY, factor) {
+    const img = $('#tdd-lightbox-img');
+    const rect = img.getBoundingClientRect();
+    const offsetX = clientX - (rect.left + rect.width / 2);
+    const offsetY = clientY - (rect.top + rect.height / 2);
+    const prevScale = lbScale;
+    const nextScale = lbClamp(lbScale * factor);
+    if (nextScale === prevScale) return;
+    // keep the point under the cursor/finger stationary while scaling
+    lbX -= offsetX * (nextScale / prevScale - 1);
+    lbY -= offsetY * (nextScale / prevScale - 1);
+    lbScale = nextScale;
+    if (lbScale === LB_MIN) { lbX = 0; lbY = 0; }
+    lbApply();
+  }
+
   function openLightbox(src) {
     $('#tdd-lightbox-img').src = src;
+    lbReset();
     $('#tdd-lightbox').classList.remove('hidden');
   }
   function closeLightbox() {
     $('#tdd-lightbox').classList.add('hidden');
     $('#tdd-lightbox-img').src = '';
+    lbReset();
   }
   $('#tdd-lightbox-close').addEventListener('click', closeLightbox);
   $('#tdd-lightbox').addEventListener('click', (ev) => { if (ev.target.id === 'tdd-lightbox') closeLightbox(); });
-  $('#tdd-lightbox-img').addEventListener('click', closeLightbox);
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeLightbox(); });
+
+  const lbImg = $('#tdd-lightbox-img');
+
+  // double-click / double-tap toggles zoom in/out, centered on the click point
+  lbImg.addEventListener('dblclick', (ev) => { lbZoomAt(ev.clientX, ev.clientY, lbScale > 1 ? (LB_MIN / lbScale) : 2.5); });
+
+  // single click: zoom in a step if not zoomed; if already zoomed, a plain (non-drag) click zooms back out
+  lbImg.addEventListener('click', (ev) => {
+    if (lbMoved) { lbMoved = false; return; } // was a drag, not a click
+    if (lbScale > 1) lbReset(); else lbZoomAt(ev.clientX, ev.clientY, 2.5);
+  });
+
+  // mouse wheel zoom, centered on cursor
+  lbImg.addEventListener('wheel', (ev) => {
+    ev.preventDefault();
+    lbZoomAt(ev.clientX, ev.clientY, ev.deltaY < 0 ? 1.2 : 1 / 1.2);
+  }, { passive: false });
+
+  // drag to pan (mouse)
+  lbImg.addEventListener('mousedown', (ev) => {
+    if (lbScale <= 1) return;
+    lbPanning = true; lbMoved = false;
+    lbPanStartX = ev.clientX - lbX; lbPanStartY = ev.clientY - lbY;
+    lbImg.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mousemove', (ev) => {
+    if (!lbPanning) return;
+    lbMoved = true;
+    lbX = ev.clientX - lbPanStartX; lbY = ev.clientY - lbPanStartY;
+    lbApply();
+  });
+  window.addEventListener('mouseup', () => { if (lbPanning) { lbPanning = false; lbApply(); } });
+
+  // touch: one-finger pan, two-finger pinch zoom
+  lbImg.addEventListener('touchstart', (ev) => {
+    if (ev.touches.length === 2) {
+      lbPinchDist = Math.hypot(ev.touches[0].clientX - ev.touches[1].clientX, ev.touches[0].clientY - ev.touches[1].clientY);
+    } else if (ev.touches.length === 1 && lbScale > 1) {
+      lbPanning = true; lbMoved = false;
+      lbPanStartX = ev.touches[0].clientX - lbX; lbPanStartY = ev.touches[0].clientY - lbY;
+    }
+  }, { passive: true });
+  lbImg.addEventListener('touchmove', (ev) => {
+    if (ev.touches.length === 2 && lbPinchDist != null) {
+      ev.preventDefault();
+      const dist = Math.hypot(ev.touches[0].clientX - ev.touches[1].clientX, ev.touches[0].clientY - ev.touches[1].clientY);
+      const midX = (ev.touches[0].clientX + ev.touches[1].clientX) / 2;
+      const midY = (ev.touches[0].clientY + ev.touches[1].clientY) / 2;
+      lbZoomAt(midX, midY, dist / lbPinchDist);
+      lbPinchDist = dist;
+    } else if (ev.touches.length === 1 && lbPanning) {
+      ev.preventDefault();
+      lbMoved = true;
+      lbX = ev.touches[0].clientX - lbPanStartX; lbY = ev.touches[0].clientY - lbPanStartY;
+      lbApply();
+    }
+  }, { passive: false });
+  lbImg.addEventListener('touchend', () => { lbPanning = false; lbPinchDist = null; });
+
+  $('#tdd-zoom-in').addEventListener('click', () => { const r = lbImg.getBoundingClientRect(); lbZoomAt(r.left + r.width/2, r.top + r.height/2, 1.5); });
+  $('#tdd-zoom-out').addEventListener('click', () => { const r = lbImg.getBoundingClientRect(); lbZoomAt(r.left + r.width/2, r.top + r.height/2, 1/1.5); });
+  $('#tdd-zoom-reset').addEventListener('click', lbReset);
 
   $('#tdd-clear-all').addEventListener('click', async () => {
     if (!currentUser || !db || !entries.length) return;
