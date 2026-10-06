@@ -285,7 +285,13 @@
 .tdd-friend-msg.friend { align-self: flex-start; background: rgba(62,156,140,0.08); border: 1px solid rgba(62,156,140,0.35); }
 .tdd-friend-msg.error { align-self: flex-start; background: rgba(189,74,52,0.08); border: 1px solid var(--rust); color: var(--rust); }
 .tdd-friend-msg .who { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); margin-bottom: 4px; }
-.tdd-friend-msg.typing { font-style: italic; color: var(--text-faint); }
+.tdd-friend-msg.typing { font-style: italic; color: var(--text-faint); display: flex; align-items: center; gap: 8px; }
+.tdd-friend-dots { display: inline-flex; gap: 3px; flex-shrink: 0; }
+.tdd-friend-dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--teal); animation: tdd-friend-bounce 1.1s infinite ease-in-out; }
+.tdd-friend-dots span:nth-child(2) { animation-delay: 0.15s; }
+.tdd-friend-dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes tdd-friend-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-4px); opacity: 1; } }
+.tdd-friend-elapsed { margin-left: auto; font-size: 11px; color: var(--text-faint); font-family: 'IBM Plex Mono', monospace; flex-shrink: 0; }
 .tdd-friend-gate { text-align: center; color: var(--text-faint); font-size: 13px; padding: 30px 10px; }
 .tdd-friend-gate button { margin-top: 10px; }
 .tdd-friend-input-row { display: flex; gap: 8px; padding: 12px 15px; border-top: 1px solid var(--border); }
@@ -1770,16 +1776,40 @@
     wrap.scrollTop = wrap.scrollHeight;
     return div;
   }
+  const FRIEND_STAGES = [
+    'pulling daily / 4H / 1H candles from Binance…',
+    'reading your journal history…',
+    'cross-checking your playbook & SMC structure…',
+    'weighing a verdict…',
+  ];
+  let friendStageTimer = null, friendElapsedTimer = null, friendStartTime = 0;
+
   function appendFriendTyping() {
     const wrap = $('#tdd-friend-messages');
     const div = document.createElement('div');
     div.className = 'tdd-friend-msg friend typing';
     div.id = 'tdd-friend-typing';
-    div.textContent = 'thinking through the structure…';
+    div.innerHTML = '<span class="tdd-friend-dots"><span></span><span></span><span></span></span>' +
+      '<span id="tdd-friend-stage-text">' + FRIEND_STAGES[0] + '</span>' +
+      '<span id="tdd-friend-elapsed" class="tdd-friend-elapsed">0s</span>';
     wrap.appendChild(div);
     wrap.scrollTop = wrap.scrollHeight;
+
+    friendStartTime = Date.now();
+    let stageIdx = 0;
+    friendStageTimer = setInterval(() => {
+      stageIdx = (stageIdx + 1) % FRIEND_STAGES.length;
+      const stageEl = document.getElementById('tdd-friend-stage-text');
+      if (stageEl) stageEl.textContent = FRIEND_STAGES[stageIdx];
+    }, 2800);
+    friendElapsedTimer = setInterval(() => {
+      const elEl = document.getElementById('tdd-friend-elapsed');
+      if (elEl) elEl.textContent = Math.round((Date.now() - friendStartTime) / 1000) + 's';
+    }, 1000);
   }
   function removeFriendTyping() {
+    if (friendStageTimer) { clearInterval(friendStageTimer); friendStageTimer = null; }
+    if (friendElapsedTimer) { clearInterval(friendElapsedTimer); friendElapsedTimer = null; }
     const el = document.getElementById('tdd-friend-typing');
     if (el) el.remove();
   }
