@@ -273,6 +273,25 @@
 }
 .tdd-chart-hint { font-size: 11.5px; color: var(--text-faint); }
 .tdd-tv-wrap { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 5px; padding: 4px; min-height: 520px; }
+
+/* trading friend chat */
+.tdd-friend { margin-top: 16px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 5px; display: flex; flex-direction: column; }
+.tdd-friend-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 15px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.tdd-friend-title { font-weight: 600; font-size: 14px; color: var(--amber); }
+.tdd-friend-sub { display: block; font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
+.tdd-friend-messages { max-height: 440px; min-height: 140px; overflow-y: auto; padding: 14px 15px; display: flex; flex-direction: column; gap: 10px; }
+.tdd-friend-msg { max-width: 88%; padding: 9px 12px; border-radius: 6px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+.tdd-friend-msg.me { align-self: flex-end; background: var(--bg-panel-raised); border: 1px solid var(--border); }
+.tdd-friend-msg.friend { align-self: flex-start; background: rgba(62,156,140,0.08); border: 1px solid rgba(62,156,140,0.35); }
+.tdd-friend-msg.error { align-self: flex-start; background: rgba(189,74,52,0.08); border: 1px solid var(--rust); color: var(--rust); }
+.tdd-friend-msg .who { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); margin-bottom: 4px; }
+.tdd-friend-msg.typing { font-style: italic; color: var(--text-faint); }
+.tdd-friend-gate { text-align: center; color: var(--text-faint); font-size: 13px; padding: 30px 10px; }
+.tdd-friend-gate button { margin-top: 10px; }
+.tdd-friend-input-row { display: flex; gap: 8px; padding: 12px 15px; border-top: 1px solid var(--border); }
+.tdd-friend-input-row textarea { flex: 1; resize: none; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; padding: 9px 11px; max-height: 120px; }
+.tdd-friend-input-row textarea:focus { outline: none; border-color: var(--teal); }
+.tdd-friend-input-row button { align-self: flex-end; }
 #tv-iframe { width: 100%; height: 520px; display: block; border-radius: 3px; }
 
 /* analytics */
@@ -769,6 +788,21 @@
       <div class="tdd-tv-wrap">
         <iframe id="tv-iframe" title="TradingView chart" frameborder="0" allowtransparency="true" allowfullscreen></iframe>
       </div>
+
+      <!-- TRADING FRIEND CHAT -->
+      <div class="tdd-friend">
+        <div class="tdd-friend-head">
+          <div><span class="tdd-friend-title">Trading friend</span><span class="tdd-friend-sub">Knows your playbook, rules and journal. Reads daily / 4H / 1H structure on <span id="tdd-friend-symbol">BTCUSDT</span>.</span></div>
+          <button class="tdd-btn small" id="tdd-friend-quick">What's your take on current market structure?</button>
+        </div>
+        <div class="tdd-friend-messages" id="tdd-friend-messages">
+          <div class="tdd-friend-gate" id="tdd-friend-gate">Sign in to talk to your trading friend — it uses your own journal and account.<br><button class="tdd-btn" id="tdd-friend-signin">Sign in</button></div>
+        </div>
+        <div class="tdd-friend-input-row">
+          <textarea id="tdd-friend-input" placeholder="Ask about current structure, a setup, or paste what you're seeing..." rows="1" disabled></textarea>
+          <button class="tdd-btn" id="tdd-friend-send" disabled>Send</button>
+        </div>
+      </div>
     </div>
 
     <!-- PLAYBOOK -->
@@ -1148,6 +1182,8 @@
   function setTVSymbol(symbol) {
     tvSymbol = symbol;
     $('#tv-iframe').src = buildTVUrl(symbol);
+    const friendSym = $('#tdd-friend-symbol');
+    if (friendSym) friendSym.textContent = symbol.split(':').pop();
   }
 
   function ensureChartLoaded() {
@@ -1632,6 +1668,10 @@
     db = firebase.database();
     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
   }
+
+  // --- trading friend backend (free Cloudflare Worker — see trading-friend-worker/SETUP.md) ---
+  // After deploying the Worker, paste its workers.dev URL here (no path needed).
+  const TRADING_FRIEND_ENDPOINT = "https://trading-friend.shivamk345.workers.dev";
   function snapshotToEntries(val) {
     if (!val) return [];
     return Object.keys(val)
@@ -1674,6 +1714,7 @@
     auth.onAuthStateChanged(user => {
       currentUser = user;
       updateAuthUI();
+      updateFriendGate();
       if (user) {
         attachPositionsListener(user.uid);
         attachStreakListener(user.uid);
@@ -1688,6 +1729,120 @@
   } else {
     updateAuthUI();
   }
+
+  // --- trading friend chat ---
+  let friendHistory = []; // [{role:'user'|'assistant', content:string}]
+  let friendBusy = false;
+
+  function updateFriendGate() {
+    const gate = $('#tdd-friend-gate');
+    const input = $('#tdd-friend-input');
+    const send = $('#tdd-friend-send');
+    const quick = $('#tdd-friend-quick');
+    if (!gate) return;
+    if (currentUser) {
+      gate.style.display = 'none';
+      input.disabled = false;
+      send.disabled = false;
+      quick.disabled = false;
+    } else {
+      gate.style.display = 'block';
+      input.disabled = true;
+      send.disabled = true;
+      quick.disabled = true;
+    }
+  }
+  const friendSigninBtn = document.getElementById('tdd-friend-signin');
+  if (friendSigninBtn) friendSigninBtn.addEventListener('click', () => openAuthModal());
+
+  function appendFriendMsg(role, text) {
+    const wrap = $('#tdd-friend-messages');
+    const div = document.createElement('div');
+    div.className = 'tdd-friend-msg ' + (role === 'user' ? 'me' : role === 'error' ? 'error' : 'friend');
+    const who = document.createElement('span');
+    who.className = 'who';
+    who.textContent = role === 'user' ? 'You' : role === 'error' ? 'Error' : 'Trading friend';
+    const body = document.createElement('div');
+    body.textContent = text;
+    div.appendChild(who);
+    div.appendChild(body);
+    wrap.appendChild(div);
+    wrap.scrollTop = wrap.scrollHeight;
+    return div;
+  }
+  function appendFriendTyping() {
+    const wrap = $('#tdd-friend-messages');
+    const div = document.createElement('div');
+    div.className = 'tdd-friend-msg friend typing';
+    div.id = 'tdd-friend-typing';
+    div.textContent = 'thinking through the structure…';
+    wrap.appendChild(div);
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+  function removeFriendTyping() {
+    const el = document.getElementById('tdd-friend-typing');
+    if (el) el.remove();
+  }
+
+  async function sendFriendMessage(text) {
+    if (!text || friendBusy) return;
+    if (!currentUser) { openAuthModal(); return; }
+    if (!TRADING_FRIEND_ENDPOINT || TRADING_FRIEND_ENDPOINT.indexOf('YOUR-WORKER-SUBDOMAIN') !== -1) {
+      appendFriendMsg('error', "Trading friend isn't connected yet — deploy the Worker in trading-friend-worker/ (see SETUP.md), then paste its URL into TRADING_FRIEND_ENDPOINT near the top of this file's script.");
+      return;
+    }
+    friendBusy = true;
+    $('#tdd-friend-send').disabled = true;
+    appendFriendMsg('user', text);
+    friendHistory.push({ role: 'user', content: text });
+    appendFriendTyping();
+    try {
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch(TRADING_FRIEND_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: idToken, message: text, history: friendHistory.slice(-12), symbol: tvSymbol })
+      });
+      let data = {};
+      try { data = await res.json(); } catch (e) {}
+      removeFriendTyping();
+      if (!res.ok || data.error) {
+        appendFriendMsg('error', data.error || ('Request failed (HTTP ' + res.status + ').'));
+        return;
+      }
+      const reply = data.reply || "Didn't get a response — try again.";
+      appendFriendMsg('assistant', reply);
+      friendHistory.push({ role: 'assistant', content: reply });
+    } catch (e) {
+      removeFriendTyping();
+      appendFriendMsg('error', 'Could not reach the trading friend backend. ' + (e.message || e));
+    } finally {
+      friendBusy = false;
+      if (currentUser) $('#tdd-friend-send').disabled = false;
+    }
+  }
+
+  const friendInput = $('#tdd-friend-input');
+  friendInput.addEventListener('input', () => {
+    friendInput.style.height = 'auto';
+    friendInput.style.height = Math.min(120, friendInput.scrollHeight) + 'px';
+  });
+  friendInput.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && !ev.shiftKey) {
+      ev.preventDefault();
+      const text = friendInput.value.trim();
+      if (text) { friendInput.value = ''; friendInput.style.height = 'auto'; sendFriendMessage(text); }
+    }
+  });
+  $('#tdd-friend-send').addEventListener('click', () => {
+    const text = friendInput.value.trim();
+    if (text) { friendInput.value = ''; friendInput.style.height = 'auto'; sendFriendMessage(text); }
+  });
+  $('#tdd-friend-quick').addEventListener('click', () => {
+    sendFriendMessage("What's your take on the current market structure on " + tvSymbol.split(':').pop() + "? Give me your best trade if there is one.");
+  });
+
+  updateFriendGate();
 
   // --- auth modal ---
   function openAuthModal(forSave) {
