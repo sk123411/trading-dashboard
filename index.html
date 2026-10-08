@@ -283,6 +283,13 @@
 .tdd-friend-toggles input[type="checkbox"] { accent-color: var(--teal); cursor: pointer; }
 .tdd-friend-provider-select { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 11.5px; padding: 3px 6px; cursor: pointer; }
 .tdd-friend-provider-select:focus { outline: none; border-color: var(--teal); }
+.tdd-friend-history-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 15px; border-bottom: 1px solid var(--border); font-size: 11.5px; }
+.tdd-friend-date { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 11.5px; padding: 3px 6px; color-scheme: dark; }
+.tdd-friend-date:focus { outline: none; border-color: var(--teal); }
+.tdd-friend-count { margin-left: auto; color: var(--text-faint); font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; }
+.tdd-friend-day { display: flex; align-items: center; gap: 10px; color: var(--text-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; margin: 4px 0; }
+.tdd-friend-day::before, .tdd-friend-day::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.tdd-friend-note { text-align: center; color: var(--text-faint); font-size: 12px; font-style: italic; padding: 18px 10px; }
 .tdd-friend-model-tag { font-size: 10px; color: var(--text-faint); margin-top: 5px; font-family: 'IBM Plex Mono', monospace; opacity: 0.8; }
 .tdd-friend-title { font-weight: 600; font-size: 14px; color: var(--amber); }
 .tdd-friend-sub { display: block; font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
@@ -819,6 +826,15 @@
             <option value="groq">Groq</option>
             <option value="openrouter">OpenRouter</option>
           </select>
+        </div>
+        <div class="tdd-friend-history-bar">
+          <span class="tdd-friend-toggles-label">From:</span>
+          <input type="date" id="tdd-friend-from" class="tdd-friend-date">
+          <span class="tdd-friend-toggles-label">To:</span>
+          <input type="date" id="tdd-friend-to" class="tdd-friend-date">
+          <button class="tdd-btn ghost small" id="tdd-friend-reset5" type="button">Last 5 days</button>
+          <button class="tdd-btn ghost small" id="tdd-friend-showall" type="button">Show all</button>
+          <span id="tdd-friend-count" class="tdd-friend-count"></span>
         </div>
         <div class="tdd-friend-messages" id="tdd-friend-messages">
           <div class="tdd-friend-gate" id="tdd-friend-gate">Sign in to talk to your trading friend — it uses your own journal and account.<br><button class="tdd-btn" id="tdd-friend-signin">Sign in</button></div>
@@ -1667,7 +1683,7 @@
   }
   showStreakGate();
 
-   // ================= FIREBASE =================
+  // ================= FIREBASE =================
   // Fill in your own project's config (Firebase console → Project settings → General → Your apps → SDK setup).
   // This is a public client config, not a secret — real protection comes from the Realtime Database
   // security rules (see FIREBASE_SETUP.md), which restrict each account to its own "positions/<uid>" node.
@@ -1746,9 +1762,14 @@
         closeAuthModal();
         if (pendingSaveAfterAuth) { pendingSaveAfterAuth = false; doSaveEntry(); }
         if (pendingPlaybookSyncAfterAuth) { pendingPlaybookSyncAfterAuth = false; doSyncPlaybook(); }
+        loadFriendHistory();
       } else {
         detachPositionsListener();
         detachStreakListener();
+        friendLoadSeq++;
+        clearFriendMessages();
+        friendHistory = [];
+        $('#tdd-friend-count').textContent = '';
       }
     });
   } else {
@@ -1780,13 +1801,61 @@
   const friendSigninBtn = document.getElementById('tdd-friend-signin');
   if (friendSigninBtn) friendSigninBtn.addEventListener('click', () => openAuthModal());
 
-  function appendFriendMsg(role, text, modelTag) {
+  let friendLoadSeq = 0;      // guards against a slow history load overwriting a newer one
+  let friendLastDay = null;   // day key of the last message rendered, for day dividers
+
+  function localDateStr(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function friendDayKey(ts) { const d = new Date(ts); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); }
+  function friendDayLabel(ts) {
+    const d = new Date(ts), now = new Date();
+    if (friendDayKey(ts) === friendDayKey(now.getTime())) return 'Today';
+    const y = new Date(now); y.setDate(now.getDate() - 1);
+    if (friendDayKey(ts) === friendDayKey(y.getTime())) return 'Yesterday';
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
+  }
+  function friendTimeLabel(ts) { return new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); }
+
+  // Wipes rendered chat (but keeps the sign-in gate and any in-flight "thinking" bubble).
+  function clearFriendMessages() {
     const wrap = $('#tdd-friend-messages');
+    if (!wrap) return;
+    Array.from(wrap.children).forEach(el => {
+      if (el.id === 'tdd-friend-gate' || el.id === 'tdd-friend-typing') return;
+      el.remove();
+    });
+    friendLastDay = null;
+  }
+  function setFriendNote(text) {
+    clearFriendMessages();
+    const note = document.createElement('div');
+    note.className = 'tdd-friend-note';
+    note.id = 'tdd-friend-note';
+    note.textContent = text;
+    $('#tdd-friend-messages').appendChild(note);
+  }
+
+  function appendFriendMsg(role, text, modelTag, ts) {
+    const wrap = $('#tdd-friend-messages');
+    const oldNote = document.getElementById('tdd-friend-note');
+    if (oldNote) oldNote.remove();
+    if (ts) {
+      const key = friendDayKey(ts);
+      if (key !== friendLastDay) {
+        const divider = document.createElement('div');
+        divider.className = 'tdd-friend-day';
+        divider.textContent = friendDayLabel(ts);
+        const typing = document.getElementById('tdd-friend-typing');
+        if (typing) wrap.insertBefore(divider, typing); else wrap.appendChild(divider);
+        friendLastDay = key;
+      }
+    }
     const div = document.createElement('div');
     div.className = 'tdd-friend-msg ' + (role === 'user' ? 'me' : role === 'error' ? 'error' : 'friend');
     const who = document.createElement('span');
     who.className = 'who';
-    who.textContent = role === 'user' ? 'You' : role === 'error' ? 'Error' : 'Trading friend';
+    who.textContent = (role === 'user' ? 'You' : role === 'error' ? 'Error' : 'Trading friend') + (ts ? ' · ' + friendTimeLabel(ts) : '');
     const body = document.createElement('div');
     body.textContent = text;
     div.appendChild(who);
@@ -1839,6 +1908,69 @@
     if (el) el.remove();
   }
 
+  // --- chat history (Firebase: chats/<uid>/<pushId> = {role, content, ts, symbol, provider?, model?}) ---
+  function friendCutoffTs() {
+    const val = $('#tdd-friend-from').value;
+    if (!val) return 0; // empty = show all
+    const t = new Date(val + 'T00:00:00').getTime();
+    return isNaN(t) ? 0 : t;
+  }
+
+  function friendToTs() {
+    const val = $('#tdd-friend-to').value;
+    if (!val) return 0; // empty = up to now
+    const t = new Date(val + 'T23:59:59.999').getTime();
+    return isNaN(t) ? 0 : t;
+  }
+
+  async function loadFriendHistory() {
+    if (!currentUser || !db) return;
+    const mySeq = ++friendLoadSeq;
+    const cutoff = friendCutoffTs();
+    const toTs = friendToTs();
+    if (toTs && cutoff && toTs < cutoff) { setFriendNote('"From" date is after the "To" date — adjust the range.'); $('#tdd-friend-count').textContent = ''; return; }
+    setFriendNote('Loading your chat history…');
+    try {
+      let q = db.ref('chats/' + currentUser.uid).orderByChild('ts').startAt(cutoff);
+      if (toTs) q = q.endAt(toTs);
+      const snap = await q.limitToLast(400).once('value');
+      if (mySeq !== friendLoadSeq) return; // a newer load (or sign-out) superseded this one
+      const msgs = [];
+      snap.forEach(child => { const v = child.val(); if (v && v.content) msgs.push(v); });
+      msgs.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+
+      clearFriendMessages();
+      msgs.forEach(m => {
+        const tag = (m.role === 'assistant' && m.provider && m.model) ? (m.provider + '/' + m.model) : null;
+        appendFriendMsg(m.role === 'user' ? 'user' : 'assistant', m.content, tag, m.ts);
+      });
+      if (!msgs.length) setFriendNote((cutoff || toTs) ? 'No messages in this date range. Ask your trading friend something, or widen the range.' : 'No chat history yet — ask your trading friend something.');
+
+      // The next prompt carries this history as context (the Worker uses the most recent turns).
+      // Only when the range runs up to today — browsing an old range shouldn't swap in old context.
+      if (!toTs || toTs >= Date.now() - 86400000) {
+        friendHistory = msgs.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }));
+      }
+      const fmt = t => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      const rangeText = cutoff && toTs ? fmt(cutoff) + ' – ' + fmt(toTs) : cutoff ? 'since ' + fmt(cutoff) : toTs ? 'up to ' + fmt(toTs) : 'all time';
+      $('#tdd-friend-count').textContent = msgs.length + ' message' + (msgs.length === 1 ? '' : 's') + ' · ' + rangeText;
+    } catch (e) {
+      if (mySeq !== friendLoadSeq) return;
+      setFriendNote('Could not load chat history: ' + (e.message || e) + ' — check the Firebase rules for "chats" (see FIREBASE_SETUP.md).');
+    }
+  }
+
+  async function saveFriendExchange(userText, userTs, reply, replyTs, data) {
+    if (!currentUser || !db) return;
+    try {
+      const ref = db.ref('chats/' + currentUser.uid);
+      await ref.push({ role: 'user', content: userText, ts: userTs, symbol: tvSymbol });
+      await ref.push({ role: 'assistant', content: reply, ts: replyTs, symbol: tvSymbol, provider: data.aiProvider || null, model: data.aiModel || null });
+    } catch (e) {
+      appendFriendMsg('error', "This exchange couldn't be saved to your history: " + (e.message || e) + ' — check the Firebase rules for "chats".');
+    }
+  }
+
   async function sendFriendMessage(text) {
     if (!text || friendBusy) return;
     if (!currentUser) { openAuthModal(); return; }
@@ -1848,7 +1980,8 @@
     }
     friendBusy = true;
     $('#tdd-friend-send').disabled = true;
-    appendFriendMsg('user', text);
+    const sentAt = Date.now();
+    appendFriendMsg('user', text, null, sentAt);
     friendHistory.push({ role: 'user', content: text });
     appendFriendTyping();
     try {
@@ -1873,8 +2006,10 @@
       }
       const reply = data.reply || "Didn't get a response — try again.";
       const modelTag = (data.aiProvider && data.aiModel) ? (data.aiProvider + '/' + data.aiModel) : null;
-      appendFriendMsg('assistant', reply, modelTag);
+      const repliedAt = Date.now();
+      appendFriendMsg('assistant', reply, modelTag, repliedAt);
       friendHistory.push({ role: 'assistant', content: reply });
+      saveFriendExchange(text, sentAt, reply, repliedAt, data);
     } catch (e) {
       removeFriendTyping();
       appendFriendMsg('error', 'Could not reach the trading friend backend. ' + (e.message || e));
@@ -1903,6 +2038,18 @@
   $('#tdd-friend-quick').addEventListener('click', () => {
     sendFriendMessage("What's your take on the current market structure on " + tvSymbol.split(':').pop() + "? Give me your best trade if there is one.");
   });
+
+  // history date filter: defaults to the last 5 days
+  function setFriendFromDays(daysBack) {
+    const d = new Date();
+    d.setDate(d.getDate() - daysBack);
+    $('#tdd-friend-from').value = localDateStr(d);
+  }
+  setFriendFromDays(5);
+  $('#tdd-friend-from').addEventListener('change', loadFriendHistory);
+  $('#tdd-friend-to').addEventListener('change', loadFriendHistory);
+  $('#tdd-friend-reset5').addEventListener('click', () => { setFriendFromDays(5); $('#tdd-friend-to').value = ''; loadFriendHistory(); });
+  $('#tdd-friend-showall').addEventListener('click', () => { $('#tdd-friend-from').value = ''; $('#tdd-friend-to').value = ''; loadFriendHistory(); });
 
   updateFriendGate();
 
