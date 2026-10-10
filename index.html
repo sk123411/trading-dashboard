@@ -319,6 +319,17 @@
 .tdd-stat { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 5px; padding: 14px 16px; }
 .tdd-stat .n { font-family: 'IBM Plex Mono', monospace; font-size: 22px; color: var(--text); }
 .tdd-stat .l { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+.tdd-pnl-wrap { margin-bottom: 18px; }
+.tdd-pnl-title { font-size: 13px; font-weight: 600; margin: 0 0 8px 0; color: var(--text); }
+.tdd-pnl-wrap .tdd-stat-row { margin-bottom: 10px; }
+.tdd-pnl-pos { color: var(--candle-green) !important; }
+.tdd-pnl-neg { color: var(--candle-red) !important; }
+.tdd-pnl-note { font-size: 11.5px; color: var(--text-faint); line-height: 1.55; margin: 0 0 4px 0; }
+.tdd-plan { background: var(--bg-panel); border: 1px solid var(--border); border-left: 3px solid var(--amber); border-radius: 4px; padding: 12px 14px; }
+.tdd-plan textarea { min-height: 78px; }
+.tdd-plan-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tdd-plan-status { font-size: 11px; color: var(--text-faint); margin-left: 8px; }
+.tdd-plan-hint { font-size: 11px; color: var(--text-faint); }
 .tdd-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
 .tdd-bar-label { width: 230px; flex-shrink: 0; font-size: 12px; color: var(--text-dim); }
 .tdd-bar-track { flex: 1; background: var(--bg-panel-raised); border-radius: 3px; height: 16px; overflow: hidden; }
@@ -874,6 +885,14 @@
       </div>
 
       <div class="tdd-form" id="tdd-trade-form">
+        <div class="tdd-field full tdd-plan">
+          <label>next plan of action <span class="tdd-plan-status" id="tdd-plan-status"></span></label>
+          <textarea id="tdd-plan-text" placeholder="What will you do next, and under what conditions? e.g. wait for a 4H close above 87,230 before looking long; no trades until the daily level is retested." disabled></textarea>
+          <div class="tdd-plan-row">
+            <button class="tdd-btn small" id="tdd-plan-save" type="button" disabled>Save plan</button>
+            <span class="tdd-plan-hint">Saved on its own, like your streak — separate from the trade entry below.</span>
+          </div>
+        </div>
         <div class="tdd-field"><label>date</label><input type="date" id="f-date"></div>
         <div class="tdd-field"><label>pair / symbol</label><input type="text" id="f-symbol" placeholder="e.g. BTCUSDT"></div>
 
@@ -899,6 +918,7 @@
         <div class="tdd-field"><label>outcome</label>
           <select id="f-outcome"><option value="open">Still open</option><option value="win">Win</option><option value="loss">Loss (stopped out)</option><option value="liquidated">Liquidated</option><option value="breakeven">Breakeven</option></select>
         </div>
+        <div class="tdd-field full"><label>actual result — % of capital (optional; leave blank to estimate from R:R and risk)</label><input type="number" id="f-pnl" step="any" placeholder="e.g. 2.4 for a +2.4% gain, -1 for a -1% loss"></div>
 
         <div class="tdd-field full">
           <label>are you sure you're not trading a range? (mark support/resistance on a longer timeframe first)</label>
@@ -1002,6 +1022,7 @@
     <div class="tdd-panel" id="panel-journal">
       <h1 class="tdd-h1">Journal history</h1>
       <p class="tdd-sub">Every entry you've logged, most recent first. This is the record — don't edit your memory of a trade after the fact.</p>
+      <div id="tdd-pnl-summary" class="tdd-pnl-wrap"></div>
       <div id="tdd-entries"></div>
       <button class="tdd-btn ghost small" id="tdd-clear-all" style="margin-top:10px;">Clear all entries</button>
     </div>
@@ -1683,6 +1704,51 @@
   }
   showStreakGate();
 
+  // --- next plan of action: saved on its own node (plans/<uid>/next), independent of trades ---
+  let planLoadSeq = 0;
+  function setPlanStatus(t) { $('#tdd-plan-status').textContent = t ? '· ' + t : ''; }
+  function setPlanEnabled(on) {
+    $('#tdd-plan-text').disabled = !on;
+    $('#tdd-plan-save').disabled = !on;
+  }
+  function clearPlan() {
+    planLoadSeq++;
+    $('#tdd-plan-text').value = '';
+    setPlanEnabled(false);
+    setPlanStatus('sign in to save your plan');
+  }
+  async function loadPlan() {
+    if (!currentUser || !db) return;
+    const seq = ++planLoadSeq;
+    setPlanEnabled(true);
+    setPlanStatus('loading…');
+    try {
+      const snap = await db.ref('plans/' + currentUser.uid + '/next').once('value');
+      if (seq !== planLoadSeq) return;
+      const v = snap.val() || {};
+      $('#tdd-plan-text').value = v.text || '';
+      setPlanStatus(v.updatedAt ? 'last saved ' + new Date(v.updatedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'not saved yet');
+    } catch (e) {
+      if (seq !== planLoadSeq) return;
+      setPlanStatus('could not load — check the Firebase rules for "plans"');
+    }
+  }
+  async function savePlan() {
+    if (!currentUser || !db) { openAuthModal(); return; }
+    const btn = $('#tdd-plan-save');
+    btn.disabled = true;
+    try {
+      await db.ref('plans/' + currentUser.uid + '/next').set({ text: $('#tdd-plan-text').value, updatedAt: Date.now() });
+      setPlanStatus('saved just now');
+    } catch (e) {
+      setPlanStatus('could not save — ' + (e.message || e));
+    } finally {
+      if (currentUser) btn.disabled = false;
+    }
+  }
+  $('#tdd-plan-save').addEventListener('click', savePlan);
+  clearPlan();
+
   // ================= FIREBASE =================
   // Fill in your own project's config (Firebase console → Project settings → General → Your apps → SDK setup).
   // This is a public client config, not a secret — real protection comes from the Realtime Database
@@ -1763,10 +1829,12 @@
         if (pendingSaveAfterAuth) { pendingSaveAfterAuth = false; doSaveEntry(); }
         if (pendingPlaybookSyncAfterAuth) { pendingPlaybookSyncAfterAuth = false; doSyncPlaybook(); }
         loadFriendHistory();
+        loadPlan();
       } else {
         detachPositionsListener();
         detachStreakListener();
         friendLoadSeq++;
+        clearPlan();
         clearFriendMessages();
         friendHistory = [];
         $('#tdd-friend-count').textContent = '';
@@ -2223,6 +2291,7 @@
       bigWin: $('#f-bigwin').checked,
       marksDrawn: marksDrawn,
       outcome: $('#f-outcome').value,
+      pnlPct: $('#f-pnl').value,
       daily: $('input[name="f-daily"]:checked').value,
       candleClosed: $('input[name="f-candleclosed"]:checked').value,
       goodLevel: $('input[name="f-goodlevel"]:checked').value,
@@ -2250,6 +2319,7 @@
     $('#f-leverage').value = '1';
     $('#f-risk').value = '1';
     $('#f-outcome').value = 'open';
+    $('#f-pnl').value = '';
     $$('#tdd-mistake-checks input').forEach(c => c.checked = false);
     $('#f-mark-support').checked = false;
     $('#f-mark-resistance').checked = false;
@@ -2283,6 +2353,7 @@
     $('#f-target').value = e.target || '';
     $('#f-risk').value = e.risk || '1';
     $('#f-outcome').value = e.outcome || 'open';
+    $('#f-pnl').value = (e.pnlPct != null && e.pnlPct !== '') ? e.pnlPct : '';
     $('#f-range-check').value = e.rangeCheck || 'not-checked';
     $('#f-reversal-trend-check').value = e.reversalTrendCheck || 'na';
     $('#f-chart-pattern').value = e.chartPattern || 'none';
@@ -2370,9 +2441,109 @@
     return {'none':'none noted', 'yes-planned':'pattern noted, target/stop planned', 'yes-not-planned':'pattern noted, target/stop NOT planned'}[r] || r;
   }
 
+  // Per-trade result. Uses the optional "actual result" field when filled; otherwise estimates
+  // from outcome: win = +R:R x risk%, loss/liquidated = -risk%, breakeven = 0. Open trades are skipped.
+  function entryResult(e) {
+    const o = e.outcome;
+    if (!o || o === 'open') return null;
+    const riskPct = parseFloat(e.risk);
+    const risk = isNaN(riskPct) ? 0 : riskPct;
+    const rrMatch = /([\d.]+)\s*$/.exec(e.rr || '');
+    const rr = rrMatch ? parseFloat(rrMatch[1]) : null;
+    const actual = parseFloat(e.pnlPct);
+    if (!isNaN(actual)) {
+      return { pct: actual, r: risk > 0 ? actual / risk : null, estimated: false, cls: actual > 0 ? 'win' : actual < 0 ? 'loss' : 'be' };
+    }
+    if (o === 'win') {
+      if (rr == null) return { unpriced: true };
+      return { pct: rr * risk, r: rr, estimated: true, cls: 'win' };
+    }
+    if (o === 'loss' || o === 'liquidated') return { pct: -risk, r: -1, estimated: true, cls: 'loss' };
+    return { pct: 0, r: 0, estimated: true, cls: 'be' };
+  }
+
+  function fmtPct(n, dp) { return (n >= 0 ? '+' : '') + n.toFixed(dp == null ? 2 : dp) + '%'; }
+  function signClass(n) { return n > 0 ? 'tdd-pnl-pos' : n < 0 ? 'tdd-pnl-neg' : ''; }
+
+  function renderPnlSummary() {
+    const box = $('#tdd-pnl-summary');
+    if (!box) return;
+    if (!currentUser || !entries.length) { box.innerHTML = ''; return; }
+
+    const open = entries.filter(e => e.outcome === 'open' || !e.outcome).length;
+    const priced = [];
+    let unpriced = 0;
+    entries.forEach(e => {
+      const r = entryResult(e);
+      if (!r) return;
+      if (r.unpriced) { unpriced++; return; }
+      priced.push(Object.assign({ e: e }, r));
+    });
+
+    if (!priced.length) {
+      box.innerHTML = '<div class="tdd-pnl-title">Performance</div><p class="tdd-pnl-note">No closed trades to total yet — set an outcome (win / loss / breakeven / liquidated) on a trade and it will count here.' +
+        (open ? ' ' + open + ' still open.' : '') + (unpriced ? ' ' + unpriced + ' win(s) have no target/R:R or actual result, so they can\'t be priced.' : '') + '</p>';
+      return;
+    }
+
+    const wins = priced.filter(t => t.cls === 'win');
+    const losses = priced.filter(t => t.cls === 'loss');
+    const bes = priced.filter(t => t.cls === 'be');
+    const netPct = priced.reduce((a, t) => a + t.pct, 0);
+    const rTrades = priced.filter(t => t.r != null);
+    const netR = rTrades.reduce((a, t) => a + t.r, 0);
+    const grossWin = wins.reduce((a, t) => a + t.pct, 0);
+    const grossLoss = Math.abs(losses.reduce((a, t) => a + t.pct, 0));
+    const decided = wins.length + losses.length;
+    const winRate = decided ? Math.round(wins.length / decided * 100) : null;
+    const avgWin = wins.length ? grossWin / wins.length : null;
+    const avgLoss = losses.length ? -grossLoss / losses.length : null;
+    const expectancy = rTrades.length ? netR / rTrades.length : null;
+    let pf = null, pfText = '—';
+    if (grossLoss > 0) { pf = grossWin / grossLoss; pfText = pf.toFixed(2); }
+    else if (grossWin > 0) pfText = '∞';
+
+    // compounded ROI + max drawdown over the equity curve, oldest trade first
+    const chrono = priced.slice().sort((a, b) => ((a.e.date || '').localeCompare(b.e.date || '')) || ((a.e.createdAt || 0) - (b.e.createdAt || 0)));
+    let eq = 1, peak = 1, maxDD = 0;
+    chrono.forEach(t => {
+      eq = Math.max(0, eq * (1 + t.pct / 100));
+      if (eq > peak) peak = eq;
+      const dd = peak > 0 ? (peak - eq) / peak * 100 : 0;
+      if (dd > maxDD) maxDD = dd;
+    });
+    const roi = (eq - 1) * 100;
+
+    const best = priced.reduce((a, t) => (t.pct > a.pct ? t : a), priced[0]);
+    const worst = priced.reduce((a, t) => (t.pct < a.pct ? t : a), priced[0]);
+    const label = t => t.e.symbol + ' ' + t.e.direction + ' (' + t.e.date + ')';
+    const estCount = priced.filter(t => t.estimated).length;
+
+    const stat = (n, l, cls) => '<div class="tdd-stat"><div class="n ' + (cls || '') + '">' + n + '</div><div class="l">' + l + '</div></div>';
+    box.innerHTML =
+      '<div class="tdd-pnl-title">Performance — all closed trades</div>' +
+      '<div class="tdd-stat-row">' +
+        stat(fmtPct(netPct), 'net P&amp;L (sum, % of capital)', signClass(netPct)) +
+        stat(fmtPct(roi), 'ROI (compounded, % of capital)', signClass(roi)) +
+        stat((netR >= 0 ? '+' : '') + netR.toFixed(2) + 'R', 'net R (' + rTrades.length + ' trade' + (rTrades.length === 1 ? '' : 's') + ')', signClass(netR)) +
+        stat(winRate == null ? '—' : winRate + '%', 'win rate · ' + wins.length + 'W / ' + losses.length + 'L / ' + bes.length + ' BE') +
+      '</div>' +
+      '<div class="tdd-stat-row">' +
+        stat(pfText, 'profit factor (gross win ÷ gross loss)') +
+        stat(expectancy == null ? '—' : (expectancy >= 0 ? '+' : '') + expectancy.toFixed(2) + 'R', 'expectancy per trade', expectancy == null ? '' : signClass(expectancy)) +
+        stat((avgWin == null ? '—' : fmtPct(avgWin)) + ' / ' + (avgLoss == null ? '—' : fmtPct(avgLoss)), 'avg win / avg loss', '') +
+        stat(maxDD > 0 ? '-' + maxDD.toFixed(2) + '%' : '0%', 'max drawdown (compounded)', maxDD > 0 ? 'tdd-pnl-neg' : '') +
+      '</div>' +
+      '<p class="tdd-pnl-note">Best: ' + label(best) + ' ' + fmtPct(best.pct) + ' · Worst: ' + label(worst) + ' ' + fmtPct(worst.pct) +
+        ' · ' + open + ' open (not counted)' + (unpriced ? ' · ' + unpriced + ' win(s) skipped — no target/R:R or actual result' : '') + '</p>' +
+      '<p class="tdd-pnl-note">' + estCount + ' of ' + priced.length + ' trade' + (priced.length === 1 ? ' is' : 's are') + ' estimated from your R:R and risk % (a win is assumed to hit its target, a loss to stop out at exactly -1R). ' +
+        'Enter an actual result on a trade to replace its estimate — especially liquidations, which can lose more than the risk % you set.</p>';
+  }
+
   function renderJournal() {
     const el = $('#tdd-entries');
     $('#tdd-count-foot').textContent = currentUser ? entries.length : 0;
+    renderPnlSummary();
     if (!currentUser) {
       el.innerHTML = '<div class="tdd-signin-gate">Sign in to view and save your trade journal.<br><button class="tdd-btn" id="tdd-journal-signin">Sign in</button></div>';
       $('#tdd-journal-signin').addEventListener('click', () => openAuthModal());
