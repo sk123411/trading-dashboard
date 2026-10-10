@@ -290,6 +290,10 @@
 .tdd-friend-day { display: flex; align-items: center; gap: 10px; color: var(--text-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; margin: 4px 0; }
 .tdd-friend-day::before, .tdd-friend-day::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 .tdd-friend-note { text-align: center; color: var(--text-faint); font-size: 12px; font-style: italic; padding: 18px 10px; }
+.tdd-friend.tdd-friend-adminonly .tdd-friend-toggles,
+.tdd-friend.tdd-friend-adminonly .tdd-friend-history-bar,
+.tdd-friend.tdd-friend-adminonly .tdd-friend-input-row,
+.tdd-friend.tdd-friend-adminonly #tdd-friend-quick { display: none; }
 .tdd-friend-model-tag { font-size: 10px; color: var(--text-faint); margin-top: 5px; font-family: 'IBM Plex Mono', monospace; opacity: 0.8; }
 .tdd-friend-title { font-weight: 600; font-size: 14px; color: var(--amber); }
 .tdd-friend-sub { display: block; font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
@@ -849,6 +853,7 @@
         </div>
         <div class="tdd-friend-messages" id="tdd-friend-messages">
           <div class="tdd-friend-gate" id="tdd-friend-gate">Sign in to talk to your trading friend — it uses your own journal and account.<br><button class="tdd-btn" id="tdd-friend-signin">Sign in</button></div>
+          <div class="tdd-friend-gate" id="tdd-friend-locked" style="display:none;">The trading friend is limited to the admin account.</div>
         </div>
         <div class="tdd-friend-input-row">
           <textarea id="tdd-friend-input" placeholder="Ask about current structure, a setup, or paste what you're seeing..." rows="1" disabled></textarea>
@@ -1828,7 +1833,7 @@
         closeAuthModal();
         if (pendingSaveAfterAuth) { pendingSaveAfterAuth = false; doSaveEntry(); }
         if (pendingPlaybookSyncAfterAuth) { pendingPlaybookSyncAfterAuth = false; doSyncPlaybook(); }
-        loadFriendHistory();
+        if (isFriendAdmin()) loadFriendHistory();
         loadPlan();
       } else {
         detachPositionsListener();
@@ -1848,23 +1853,28 @@
   let friendHistory = []; // [{role:'user'|'assistant', content:string}]
   let friendBusy = false;
 
+  // Cosmetic only — the Worker is what actually enforces this, by verifying the
+  // signed-in user's token server-side. Keep this address in sync with ADMIN_EMAIL
+  // in trading-friend-worker/wrangler.jsonc.
+  const FRIEND_ADMIN_EMAIL = 'shivamk345@gmail.com';
+  function isFriendAdmin() {
+    return !!(currentUser && currentUser.email && currentUser.email.toLowerCase() === FRIEND_ADMIN_EMAIL);
+  }
+
   function updateFriendGate() {
     const gate = $('#tdd-friend-gate');
+    const locked = $('#tdd-friend-locked');
     const input = $('#tdd-friend-input');
     const send = $('#tdd-friend-send');
     const quick = $('#tdd-friend-quick');
     if (!gate) return;
-    if (currentUser) {
-      gate.style.display = 'none';
-      input.disabled = false;
-      send.disabled = false;
-      quick.disabled = false;
-    } else {
-      gate.style.display = 'block';
-      input.disabled = true;
-      send.disabled = true;
-      quick.disabled = true;
-    }
+    const admin = isFriendAdmin();
+    gate.style.display = currentUser ? 'none' : 'block';
+    locked.style.display = (currentUser && !admin) ? 'block' : 'none';
+    $('.tdd-friend').classList.toggle('tdd-friend-adminonly', !!currentUser && !admin);
+    input.disabled = !admin;
+    send.disabled = !admin;
+    quick.disabled = !admin;
   }
   const friendSigninBtn = document.getElementById('tdd-friend-signin');
   if (friendSigninBtn) friendSigninBtn.addEventListener('click', () => openAuthModal());
@@ -1890,7 +1900,7 @@
     const wrap = $('#tdd-friend-messages');
     if (!wrap) return;
     Array.from(wrap.children).forEach(el => {
-      if (el.id === 'tdd-friend-gate' || el.id === 'tdd-friend-typing') return;
+      if (el.id === 'tdd-friend-gate' || el.id === 'tdd-friend-locked' || el.id === 'tdd-friend-typing') return;
       el.remove();
     });
     friendLastDay = null;
@@ -2042,6 +2052,7 @@
   async function sendFriendMessage(text) {
     if (!text || friendBusy) return;
     if (!currentUser) { openAuthModal(); return; }
+    if (!isFriendAdmin()) { appendFriendMsg('error', 'The trading friend is limited to the admin account.'); return; }
     if (!TRADING_FRIEND_ENDPOINT || TRADING_FRIEND_ENDPOINT.indexOf('YOUR-WORKER-SUBDOMAIN') !== -1) {
       appendFriendMsg('error', "Trading friend isn't connected yet — deploy the Worker in trading-friend-worker/ (see SETUP.md), then paste its URL into TRADING_FRIEND_ENDPOINT near the top of this file's script.");
       return;
