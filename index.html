@@ -328,6 +328,11 @@
 .tdd-pnl-wrap .tdd-stat-row { margin-bottom: 10px; }
 .tdd-pnl-pos { color: var(--candle-green) !important; }
 .tdd-pnl-neg { color: var(--candle-red) !important; }
+.tdd-fee-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tdd-fee-table th, .tdd-fee-table td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; }
+.tdd-fee-table th:first-child, .tdd-fee-table td:first-child { text-align: left; }
+.tdd-fee-table th { color: var(--text-dim); font-weight: 500; font-size: 11px; }
+.tdd-fee-scroll { overflow-x: auto; }
 .tdd-pnl-note { font-size: 11.5px; color: var(--text-faint); line-height: 1.55; margin: 0 0 4px 0; }
 .tdd-plan { background: var(--bg-panel); border: 1px solid var(--border); border-left: 3px solid var(--amber); border-radius: 4px; padding: 12px 14px; }
 .tdd-plan textarea { min-height: 78px; }
@@ -447,6 +452,7 @@
     <div class="tdd-navgroup-label">practice</div>
     <button class="tdd-navbtn" data-tab="log">New trade / checklist</button>
     <button class="tdd-navbtn" data-tab="journal">Journal history</button>
+    <button class="tdd-navbtn" data-tab="fees">P&amp;L after fees</button>
     <button class="tdd-navbtn" data-tab="analytics">Analytics</button>
     <div class="tdd-sidebar-foot">streak: <span class="tdd-mono" id="tdd-streak-foot">0</span> days · trades: <span class="tdd-mono" id="tdd-count-foot">0</span></div>
     <div class="tdd-auth-box" id="tdd-auth-box">
@@ -827,7 +833,7 @@
       <!-- TRADING FRIEND CHAT -->
       <div class="tdd-friend">
         <div class="tdd-friend-head">
-          <div><span class="tdd-friend-title">Trading friend</span><span class="tdd-friend-sub">Knows your playbook, rules and journal. Reads daily / 4H / 1H structure on <span id="tdd-friend-symbol">BTCUSDT</span>.</span></div>
+          <div><span class="tdd-friend-title">Trading friend</span><span class="tdd-friend-sub">Knows your playbook, rules and journal. Reads weekly / daily / 4H / 1H structure on <span id="tdd-friend-symbol">BTCUSDT</span>.</span></div>
           <button class="tdd-btn small" id="tdd-friend-quick">What's your take on current market structure?</button>
         </div>
         <div class="tdd-friend-toggles">
@@ -1030,6 +1036,24 @@
       <div id="tdd-pnl-summary" class="tdd-pnl-wrap"></div>
       <div id="tdd-entries"></div>
       <button class="tdd-btn ghost small" id="tdd-clear-all" style="margin-top:10px;">Clear all entries</button>
+    </div>
+
+    <!-- P&L AFTER FEES -->
+    <div class="tdd-panel" id="panel-fees">
+      <h1 class="tdd-h1">P&amp;L after fees</h1>
+      <p class="tdd-sub">Same closed trades as Journal history, with trading costs taken off. Costs are modelled as a break-even move: price has to travel this many points in your favour just to pay the round-trip fees.</p>
+      <div class="tdd-plan" style="margin-bottom:16px;">
+        <div class="tdd-pnl-title">Fee model</div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <label for="tdd-fee-points" style="font-size:12.5px; color:var(--text-dim);">Break-even move (points, up or down)</label>
+          <input type="number" id="tdd-fee-points" min="0" step="1" value="100" style="width:110px; padding:6px 8px; background:var(--bg-panel); border:1px solid var(--border); color:var(--text); border-radius:4px; font-family:'IBM Plex Mono',monospace;">
+          <button class="tdd-btn small" id="tdd-fee-save">Save</button>
+          <span class="tdd-pnl-note" id="tdd-fee-status" style="margin:0;"></span>
+        </div>
+        <p class="tdd-pnl-note" style="margin-top:8px;">Fee on each trade = points &divide; |entry &minus; stop|, in R, so a tight stop pays more R in fees than a wide one. Without a stop price, falls back to points &divide; entry &times; leverage. Trades with neither are counted gross and flagged.</p>
+      </div>
+      <div id="tdd-fees-summary" class="tdd-pnl-wrap"></div>
+      <div id="tdd-fees-table"></div>
     </div>
 
     <!-- ANALYTICS -->
@@ -1835,11 +1859,13 @@
         if (pendingPlaybookSyncAfterAuth) { pendingPlaybookSyncAfterAuth = false; doSyncPlaybook(); }
         if (isFriendAdmin()) loadFriendHistory();
         loadPlan();
+        loadFeeSetting();
       } else {
         detachPositionsListener();
         detachStreakListener();
         friendLoadSeq++;
         clearPlan();
+        feePoints = 100; $('#tdd-fee-points').value = 100; $('#tdd-fee-status').textContent = '';
         clearFriendMessages();
         friendHistory = [];
         $('#tdd-friend-count').textContent = '';
@@ -1949,7 +1975,7 @@
     return div;
   }
   const FRIEND_STAGES = [
-    'pulling daily / 4H / 1H candles…',
+    'pulling weekly / daily / 4H / 1H candles…',
     'reading your journal history…',
     'running structure & SMC analysis…',
     'weighing a verdict…',
@@ -2476,6 +2502,95 @@
   function fmtPct(n, dp) { return (n >= 0 ? '+' : '') + n.toFixed(dp == null ? 2 : dp) + '%'; }
   function signClass(n) { return n > 0 ? 'tdd-pnl-pos' : n < 0 ? 'tdd-pnl-neg' : ''; }
 
+  // ---- P&L after fees ----
+  let feePoints = 100;
+  function parseNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isNaN(n) ? null : n; }
+  // Fee cost of one round trip for a trade: { pct, r } or null when it can't be priced.
+  function entryFee(e, points, result) {
+    if (!(points > 0)) return { pct: 0, r: 0 };
+    const risk = parseNum(e.risk) || 0;
+    const entry = parseNum(e.entry), sl = parseNum(e.sl), lev = parseNum(e.leverage);
+    if (entry && sl && Math.abs(entry - sl) > 0) {
+      const feeR = points / Math.abs(entry - sl);
+      return risk > 0 ? { pct: feeR * risk, r: feeR } : null;
+    }
+    if (entry && lev) {
+      const pct = points / entry * lev * 100;
+      return { pct: pct, r: risk > 0 ? pct / risk : null };
+    }
+    return null;
+  }
+  function renderFees() {
+    const box = $('#tdd-fees-summary'), tbl = $('#tdd-fees-table');
+    if (!box || !tbl) return;
+    if (!currentUser) { box.innerHTML = '<div class="tdd-signin-gate">Sign in to see your P&amp;L after fees.</div>'; tbl.innerHTML = ''; return; }
+    const rows = [];
+    let noFee = 0;
+    entries.forEach(e => {
+      const g = entryResult(e);
+      if (!g || g.unpriced) return;
+      const f = entryFee(e, feePoints, g);
+      if (!f) noFee++;
+      const fee = f ? f.pct : 0;
+      rows.push({ e: e, gross: g.pct, fee: fee, net: g.pct - fee, grossR: g.r, netR: g.r == null ? null : (f && f.r != null ? g.r - f.r : g.r), priced: !!f });
+    });
+    if (!rows.length) { box.innerHTML = '<p class="tdd-pnl-note">No closed trades to price yet.</p>'; tbl.innerHTML = ''; return; }
+    const sum = (a, k) => a.reduce((t, x) => t + x[k], 0);
+    const grossTotal = sum(rows, 'gross'), feeTotal = sum(rows, 'fee'), netTotal = sum(rows, 'net');
+    const chrono = rows.slice().sort((a, b) => ((a.e.date || '').localeCompare(b.e.date || '')) || ((a.e.createdAt || 0) - (b.e.createdAt || 0)));
+    const roi = k => { let eq = 1; chrono.forEach(x => { eq = Math.max(0, eq * (1 + x[k] / 100)); }); return (eq - 1) * 100; };
+    const netWins = rows.filter(x => x.net > 0).length, netLoss = rows.filter(x => x.net < 0).length;
+    const flipped = rows.filter(x => x.gross > 0 && x.net <= 0).length;
+    const gw = rows.filter(x => x.net > 0).reduce((t, x) => t + x.net, 0);
+    const gl = Math.abs(rows.filter(x => x.net < 0).reduce((t, x) => t + x.net, 0));
+    const pf = gl > 0 ? (gw / gl).toFixed(2) : (gw > 0 ? '∞' : '—');
+    const rr = rows.filter(x => x.netR != null);
+    const netR = rr.reduce((t, x) => t + x.netR, 0);
+    const stat = (n, l, cls) => '<div class="tdd-stat"><div class="n ' + (cls || '') + '">' + n + '</div><div class="l">' + l + '</div></div>';
+    box.innerHTML =
+      '<div class="tdd-stat-row">' +
+        stat(fmtPct(grossTotal), 'gross P&amp;L (before fees)', signClass(grossTotal)) +
+        stat('-' + feeTotal.toFixed(2) + '%', 'total fees (' + feePoints + ' pts / trade)', feeTotal > 0 ? 'tdd-pnl-neg' : '') +
+        stat(fmtPct(netTotal), 'net P&amp;L (after fees)', signClass(netTotal)) +
+        stat(fmtPct(roi('net')), 'net ROI (compounded) · gross ' + fmtPct(roi('gross')), signClass(roi('net'))) +
+      '</div>' +
+      '<div class="tdd-stat-row">' +
+        stat(netWins + 'W / ' + netLoss + 'L', 'net win / loss count') +
+        stat(String(flipped), 'wins turned into net losses by fees', flipped ? 'tdd-pnl-neg' : '') +
+        stat(pf, 'profit factor after fees') +
+        stat((netR >= 0 ? '+' : '') + netR.toFixed(2) + 'R', 'net R after fees (' + rr.length + ' trades)', signClass(netR)) +
+      '</div>' +
+      '<p class="tdd-pnl-note">Fee drag: ' + (grossTotal !== 0 ? Math.round(feeTotal / Math.abs(grossTotal) * 100) + '% of gross P&amp;L' : 'n/a') + ' · every trade pays fees, including breakevens.' +
+        (noFee ? ' ' + noFee + ' trade(s) have no stop price or entry + leverage, so they are shown gross (no fee applied).' : '') + '</p>';
+    tbl.innerHTML = '<div class="tdd-fee-scroll"><table class="tdd-fee-table"><thead><tr><th>trade</th><th>gross</th><th>fee</th><th>net</th><th>net R</th></tr></thead><tbody>' +
+      chrono.slice().reverse().map(x =>
+        '<tr><td>' + x.e.symbol + ' ' + x.e.direction + ' · ' + x.e.date + '</td>' +
+        '<td class="' + signClass(x.gross) + '">' + fmtPct(x.gross) + '</td>' +
+        '<td>' + (x.priced ? '-' + x.fee.toFixed(2) + '%' : 'n/a') + '</td>' +
+        '<td class="' + signClass(x.net) + '">' + fmtPct(x.net) + '</td>' +
+        '<td>' + (x.netR == null ? '—' : (x.netR >= 0 ? '+' : '') + x.netR.toFixed(2) + 'R') + '</td></tr>').join('') +
+      '</tbody></table></div>';
+  }
+  async function loadFeeSetting() {
+    if (!currentUser || !db) return;
+    try {
+      const snap = await db.ref('plans/' + currentUser.uid + '/fees').once('value');
+      const v = snap.val();
+      if (v && v.points != null && !isNaN(parseFloat(v.points))) feePoints = parseFloat(v.points);
+    } catch (e) { /* keep default */ }
+    $('#tdd-fee-points').value = feePoints;
+    renderFees();
+  }
+  $('#tdd-fee-save').addEventListener('click', async () => {
+    const st = $('#tdd-fee-status');
+    const n = parseFloat($('#tdd-fee-points').value);
+    if (isNaN(n) || n < 0) { st.textContent = 'enter a number of points (0 or more)'; return; }
+    feePoints = n; renderFees();
+    if (!currentUser || !db) { st.textContent = 'applied for now — sign in to save it'; return; }
+    try { await db.ref('plans/' + currentUser.uid + '/fees').set({ points: n, updatedAt: Date.now() }); st.textContent = 'saved'; }
+    catch (e) { st.textContent = 'could not save — ' + (e.message || e); }
+  });
+
   function renderPnlSummary() {
     const box = $('#tdd-pnl-summary');
     if (!box) return;
@@ -2555,6 +2670,7 @@
     const el = $('#tdd-entries');
     $('#tdd-count-foot').textContent = currentUser ? entries.length : 0;
     renderPnlSummary();
+    renderFees();
     if (!currentUser) {
       el.innerHTML = '<div class="tdd-signin-gate">Sign in to view and save your trade journal.<br><button class="tdd-btn" id="tdd-journal-signin">Sign in</button></div>';
       $('#tdd-journal-signin').addEventListener('click', () => openAuthModal());
