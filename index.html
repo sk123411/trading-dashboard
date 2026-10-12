@@ -212,6 +212,12 @@
 .badge-long { background: rgba(62,156,140,0.14); color: var(--teal); }
 .badge-short { background: rgba(189,74,52,0.14); color: var(--rust); }
 .badge-warn { background: rgba(201,162,39,0.14); color: var(--amber); }
+.tdd-play-card .tdd-custom-actions { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
+.tdd-play-card .tdd-custom-tag { font-size: 10px; color: var(--amber); font-family: 'IBM Plex Mono', monospace; }
+.tdd-strat-form { background: var(--bg-panel); border: 1px solid var(--border); border-left: 3px solid var(--teal); border-radius: 4px; padding: 14px 16px; margin-bottom: 14px; display: none; }
+.tdd-strat-form.open { display: block; }
+.tdd-strat-form .tdd-field { margin-bottom: 10px; }
+.tdd-strat-form textarea { min-height: 96px; }
 .tdd-play-card ul { margin: 0; padding-left: 15px; }
 .tdd-play-card li { font-size: 12px; color: var(--text-dim); line-height: 1.6; }
 
@@ -875,6 +881,21 @@
       <div style="margin-bottom:14px; display:flex; align-items:center; gap:12px;">
         <button class="tdd-btn small" id="tdd-sync-playbook">Sync playbook to your account</button>
         <span class="tdd-mono" id="tdd-sync-status" style="font-size:11px; color:var(--text-faint);"></span>
+        <button class="tdd-btn small" id="tdd-strat-add">+ Add strategy</button>
+      </div>
+      <div class="tdd-strat-form" id="tdd-strat-form">
+        <div class="tdd-pnl-title" id="tdd-strat-form-title">New strategy</div>
+        <div class="tdd-field"><label>strategy name</label><input type="text" id="tdd-strat-name" maxlength="120" placeholder="e.g. 4H order block retest after sweep"></div>
+        <div class="tdd-field"><label>type</label>
+          <select id="tdd-strat-tag"><option value="long">Long</option><option value="short">Short</option><option value="warn">Anti-pattern (don't take)</option></select>
+        </div>
+        <div class="tdd-field"><label>conditions / concepts — one per line</label><textarea id="tdd-strat-concepts" placeholder="Made on 1H or 4H&#10;Price sweeps previous low&#10;Confirmation candle closes strong"></textarea></div>
+        <div class="tdd-field"><label>reference chart (optional)</label><input type="file" id="tdd-strat-img" accept="image/*">
+          <div id="tdd-strat-img-preview" style="display:none; align-items:center; gap:10px; margin-top:8px;"><img id="tdd-strat-img-thumb" style="max-width:120px; border:1px solid var(--border); border-radius:3px;"><button class="tdd-btn ghost small" type="button" id="tdd-strat-img-clear">Remove image</button></div>
+        </div>
+        <button class="tdd-btn" id="tdd-strat-save">Save strategy</button>
+        <button class="tdd-btn ghost" id="tdd-strat-cancel" type="button" style="margin-left:8px;">Cancel</button>
+        <span class="tdd-pnl-note" id="tdd-strat-status" style="margin-left:10px;"></span>
       </div>
       <div class="tdd-playbook-grid" id="tdd-playbook"></div>
     </div>
@@ -1320,15 +1341,107 @@
 
   // --- playbook ---
   const pbEl = $('#tdd-playbook');
-  STRATEGIES.forEach(s => {
+  let customStrategies = [];   // [{id, name, tag, concepts[], img, createdAt}] — synced at strategies/<uid>/custom/<id>
+  let stratEditingId = null, stratImgData = null, stratLoadSeq = 0;
+  function escHtml(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
+  function playCardHtml(s, custom) {
     const badgeClass = s.tag === 'long' ? 'badge-long' : (s.tag === 'short' ? 'badge-short' : 'badge-warn');
     const badgeText = s.tag === 'long' ? 'LONG' : (s.tag === 'short' ? 'SHORT' : 'ANTI-PATTERN');
-    const d = document.createElement('div');
-    d.className = 'tdd-play-card';
-    d.innerHTML = (s.img ? '<img src="' + s.img + '" alt="' + s.name + ' reference chart">' : '') +
-      '<div class="inner"><div class="head"><div class="name">' + s.name + '</div><div class="badge ' + badgeClass + '">' + badgeText + '</div></div>' +
-      '<ul>' + s.concepts.map(c => '<li>' + c + '</li>').join('') + '</ul></div>';
-    pbEl.appendChild(d);
+    return (s.img ? '<img src="' + escHtml(s.img) + '" alt="' + escHtml(s.name) + ' reference chart">' : '') +
+      '<div class="inner"><div class="head"><div class="name">' + escHtml(s.name) + '</div><div class="badge ' + badgeClass + '">' + badgeText + '</div></div>' +
+      '<ul>' + (s.concepts || []).map(c => '<li>' + escHtml(c) + '</li>').join('') + '</ul>' +
+      (custom ? '<div class="tdd-custom-actions"><span class="tdd-custom-tag">YOUR STRATEGY</span><button class="tdd-btn ghost small" data-strat-edit="' + escHtml(s.id) + '">Edit</button><button class="tdd-btn ghost small" data-strat-del="' + escHtml(s.id) + '">Delete</button></div>' : '') +
+      '</div>';
+  }
+  function renderPlaybook() {
+    pbEl.innerHTML = '';
+    STRATEGIES.forEach(s => { const d = document.createElement('div'); d.className = 'tdd-play-card'; d.innerHTML = playCardHtml(s, false); pbEl.appendChild(d); });
+    customStrategies.forEach(s => { const d = document.createElement('div'); d.className = 'tdd-play-card'; d.innerHTML = playCardHtml(s, true); pbEl.appendChild(d); });
+    const n = STRATEGIES.length + customStrategies.length;
+    const sub = $('#panel-playbook .tdd-sub');
+    if (sub) sub.innerHTML = 'The ' + STRATEGIES.length + ' setups you already defined as working' + (customStrategies.length ? ', plus ' + customStrategies.length + ' you added' : '') + ', with reference charts. If a trade doesn\'t match one of these, it isn\'t a setup — it\'s the ' + (n + 1) + 'th entry, and that one has never worked.';
+  }
+  renderPlaybook();
+
+  function stratStatus(t) { $('#tdd-strat-status').textContent = t || ''; }
+  function openStratForm(st) {
+    stratEditingId = st ? st.id : null;
+    stratImgData = st && st.img ? st.img : null;
+    $('#tdd-strat-form-title').textContent = st ? 'Edit strategy' : 'New strategy';
+    $('#tdd-strat-name').value = st ? st.name : '';
+    $('#tdd-strat-tag').value = st ? st.tag : 'long';
+    $('#tdd-strat-concepts').value = st ? (st.concepts || []).join('\n') : '';
+    $('#tdd-strat-img').value = '';
+    $('#tdd-strat-img-thumb').src = stratImgData || '';
+    $('#tdd-strat-img-preview').style.display = stratImgData ? 'flex' : 'none';
+    stratStatus('');
+    $('#tdd-strat-form').classList.add('open');
+    $('#tdd-strat-name').focus();
+  }
+  function closeStratForm() { $('#tdd-strat-form').classList.remove('open'); stratEditingId = null; stratImgData = null; }
+  async function loadCustomStrategies() {
+    if (!currentUser || !db) return;
+    const seq = ++stratLoadSeq;
+    try {
+      const snap = await db.ref('strategies/' + currentUser.uid + '/custom').once('value');
+      if (seq !== stratLoadSeq) return;
+      const v = snap.val() || {};
+      customStrategies = Object.keys(v).map(k => ({ id: k, name: v[k].name || '', tag: v[k].tag || 'long', concepts: Array.isArray(v[k].concepts) ? v[k].concepts : [], img: v[k].img || null, createdAt: v[k].createdAt || 0 }))
+        .sort((a, b) => a.createdAt - b.createdAt);
+      renderPlaybook();
+    } catch (e) { /* playbook still shows built-ins */ }
+  }
+  function clearCustomStrategies() { stratLoadSeq++; customStrategies = []; closeStratForm(); renderPlaybook(); }
+  async function saveStrategy() {
+    if (!currentUser || !db) { openAuthModal(); return; }
+    const name = $('#tdd-strat-name').value.trim();
+    const concepts = $('#tdd-strat-concepts').value.split('\n').map(x => x.trim()).filter(Boolean);
+    if (!name) { stratStatus('give it a name'); return; }
+    if (!concepts.length) { stratStatus('add at least one condition'); return; }
+    const btn = $('#tdd-strat-save'); btn.disabled = true; stratStatus('saving…');
+    try {
+      const ref = db.ref('strategies/' + currentUser.uid + '/custom');
+      const id = stratEditingId || ref.push().key;
+      const prev = customStrategies.find(x => x.id === id);
+      const rec = { name: name, tag: $('#tdd-strat-tag').value, concepts: concepts, img: stratImgData || null, createdAt: prev ? prev.createdAt : Date.now(), updatedAt: Date.now() };
+      await ref.child(id).set(rec);
+      const item = Object.assign({ id: id }, rec);
+      const i = customStrategies.findIndex(x => x.id === id);
+      if (i >= 0) customStrategies[i] = item; else customStrategies.push(item);
+      renderPlaybook(); closeStratForm();
+      $('#tdd-sync-status').textContent = 'Saved "' + name + '" to your account — the trading friend will use it.';
+    } catch (e) { stratStatus('could not save — ' + (e.message || e)); }
+    finally { btn.disabled = false; }
+  }
+  $('#tdd-strat-add').addEventListener('click', () => { if (!currentUser) { openAuthModal(); return; } openStratForm(null); });
+  $('#tdd-strat-cancel').addEventListener('click', closeStratForm);
+  $('#tdd-strat-save').addEventListener('click', saveStrategy);
+  $('#tdd-strat-img-clear').addEventListener('click', () => { stratImgData = null; $('#tdd-strat-img').value = ''; $('#tdd-strat-img-preview').style.display = 'none'; });
+  $('#tdd-strat-img').addEventListener('change', (ev) => {
+    const file = ev.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, 640 / img.width);
+        const c = document.createElement('canvas'); c.width = img.width * scale; c.height = img.height * scale;
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        stratImgData = c.toDataURL('image/jpeg', 0.6);
+        $('#tdd-strat-img-thumb').src = stratImgData; $('#tdd-strat-img-preview').style.display = 'flex';
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+  pbEl.addEventListener('click', async (ev) => {
+    const ed = ev.target.closest('[data-strat-edit]'), del = ev.target.closest('[data-strat-del]');
+    if (ed) { const st = customStrategies.find(x => x.id === ed.dataset.stratEdit); if (st) { openStratForm(st); $('#tdd-strat-form').scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
+    if (del) {
+      const st = customStrategies.find(x => x.id === del.dataset.stratDel);
+      if (!st || !currentUser || !confirm('Delete "' + st.name + '"?')) return;
+      try { await db.ref('strategies/' + currentUser.uid + '/custom/' + st.id).remove(); customStrategies = customStrategies.filter(x => x.id !== st.id); renderPlaybook(); }
+      catch (e) { alert('Could not delete: ' + (e.message || e)); }
+    }
   });
 
   // --- smart money examples (candlestick schematics) ---
@@ -1860,11 +1973,13 @@
         if (isFriendAdmin()) loadFriendHistory();
         loadPlan();
         loadFeeSetting();
+        loadCustomStrategies();
       } else {
         detachPositionsListener();
         detachStreakListener();
         friendLoadSeq++;
         clearPlan();
+        clearCustomStrategies();
         feePoints = 100; $('#tdd-fee-points').value = 100; $('#tdd-fee-status').textContent = '';
         clearFriendMessages();
         friendHistory = [];
