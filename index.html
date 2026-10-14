@@ -847,6 +847,7 @@
           <label><input type="checkbox" id="tdd-friend-opt-structure" checked> Market structure</label>
           <label><input type="checkbox" id="tdd-friend-opt-smc" checked> SMC concepts</label>
           <label><input type="checkbox" id="tdd-friend-opt-volatility" checked> Volatility &amp; volume</label>
+          <label title="Off = previous behaviour. On = every market reply opens with the weekly + daily bias, invalidation level, premium/discount and nearest FVG."><input type="checkbox" id="tdd-friend-opt-bigpicture"> Bigger-picture rule</label>
           <span class="tdd-friend-toggles-label" style="margin-left:auto;">AI provider:</span>
           <select id="tdd-friend-provider" class="tdd-friend-provider-select" title="Which provider to try first — still falls back through the others if it fails.">
             <option value="gemini" selected>Gemini (default)</option>
@@ -1895,7 +1896,7 @@
   // Fill in your own project's config (Firebase console → Project settings → General → Your apps → SDK setup).
   // This is a public client config, not a secret — real protection comes from the Realtime Database
   // security rules (see FIREBASE_SETUP.md), which restrict each account to its own "positions/<uid>" node.
- const firebaseConfig = {
+  const firebaseConfig = {
   apiKey: "AIzaSyAb2s0CBOVR8DBhlCVPJZpQ21XMZh_fIh0",
   authDomain: "trading-dashboard-be05e.firebaseapp.com",
   databaseURL: "https://trading-dashboard-be05e-default-rtdb.firebaseio.com",
@@ -2209,7 +2210,8 @@
       const analysis = {
         structure: $('#tdd-friend-opt-structure').checked,
         smc: $('#tdd-friend-opt-smc').checked,
-        volatility: $('#tdd-friend-opt-volatility').checked
+        volatility: $('#tdd-friend-opt-volatility').checked,
+        bigPicture: $('#tdd-friend-opt-bigpicture').checked
       };
       const preferredProvider = $('#tdd-friend-provider').value;
       const res = await fetch(TRADING_FRIEND_ENDPOINT, {
