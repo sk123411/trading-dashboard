@@ -863,6 +863,7 @@
           <button class="tdd-btn ghost small" id="tdd-friend-reset5" type="button">Last 5 days</button>
           <button class="tdd-btn ghost small" id="tdd-friend-showall" type="button">Show all</button>
           <span id="tdd-friend-count" class="tdd-friend-count"></span>
+          <button class="tdd-btn ghost small" id="tdd-friend-clear" type="button" title="Permanently delete all saved chat history from your account" style="color:var(--candle-red);">Clear history</button>
         </div>
         <div class="tdd-friend-messages" id="tdd-friend-messages">
           <div class="tdd-friend-gate" id="tdd-friend-gate">Sign in to talk to your trading friend — it uses your own journal and account.<br><button class="tdd-btn" id="tdd-friend-signin">Sign in</button></div>
@@ -1922,6 +1923,7 @@
   // --- trading friend backend (free Cloudflare Worker — see trading-friend-worker/SETUP.md) ---
   // After deploying the Worker, paste its workers.dev URL here (no path needed).
   const TRADING_FRIEND_ENDPOINT = "https://trading-friend.shivamk345.workers.dev";
+  
   function snapshotToEntries(val) {
     if (!val) return [];
     return Object.keys(val)
@@ -2267,6 +2269,25 @@
     d.setDate(d.getDate() - daysBack);
     $('#tdd-friend-from').value = localDateStr(d);
   }
+  // Permanently deletes every saved message at chats/<uid> (not just the date range on screen).
+  $('#tdd-friend-clear').addEventListener('click', async () => {
+    if (!currentUser || !db) { openAuthModal(); return; }
+    if (!confirm('Delete ALL saved chat history from your account?\n\nThis removes every message in the database (not just the date range shown) and can\'t be undone. Your journal, strategies and plan are not affected.')) return;
+    const btn = $('#tdd-friend-clear');
+    btn.disabled = true;
+    friendLoadSeq++; // drop any history load still in flight so it can't repaint old messages
+    try {
+      await db.ref('chats/' + currentUser.uid).remove();
+      clearFriendMessages();
+      friendHistory = [];
+      $('#tdd-friend-count').textContent = '0 messages';
+      setFriendNote('Chat history deleted. New messages will start a fresh history.');
+    } catch (e) {
+      alert('Could not delete chat history: ' + (e.message || e));
+    } finally {
+      btn.disabled = false;
+    }
+  });
   setFriendFromDays(5);
   $('#tdd-friend-from').addEventListener('change', loadFriendHistory);
   $('#tdd-friend-to').addEventListener('change', loadFriendHistory);
