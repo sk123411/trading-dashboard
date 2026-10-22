@@ -849,6 +849,8 @@
           <label><input type="checkbox" id="tdd-friend-opt-volatility" checked> Volatility &amp; volume</label>
           <label title="Off = previous behaviour. On = every market reply opens with the weekly + daily bias, invalidation level, premium/discount and nearest FVG."><input type="checkbox" id="tdd-friend-opt-bigpicture"> Bigger-picture rule</label>
           <label title="Off = previous behaviour. On = each market reply ends with a checklist of how many of your conditions line up (bias, sweep, structure shift, location, FVG, RSI divergence, reversal candle, volume, room to target). A checklist only — not a probability or a risk size."><input type="checkbox" id="tdd-friend-opt-confluence"> Confluence check</label>
+          <label title="Off = previous behaviour. On = adds an optional 15-minute timeframe for entry timing (crypto and NSE). Higher timeframes still decide the bias."><input type="checkbox" id="tdd-friend-opt-m15"> 15m candles</label>
+          <label title="Off = previous behaviour. On = adds order blocks and equal highs/lows (liquidity pools) on the daily and 4H as extra key levels."><input type="checkbox" id="tdd-friend-opt-extrasmc"> Extra SMC</label>
           <span class="tdd-friend-toggles-label" style="margin-left:auto;">AI provider:</span>
           <select id="tdd-friend-provider" class="tdd-friend-provider-select" title="Which provider to try first — still falls back through the others if it fails.">
             <option value="gemini" selected>Gemini (default)</option>
@@ -1898,7 +1900,7 @@
   // Fill in your own project's config (Firebase console → Project settings → General → Your apps → SDK setup).
   // This is a public client config, not a secret — real protection comes from the Realtime Database
   // security rules (see FIREBASE_SETUP.md), which restrict each account to its own "positions/<uid>" node.
- const firebaseConfig = {
+  const firebaseConfig = {
   apiKey: "AIzaSyAb2s0CBOVR8DBhlCVPJZpQ21XMZh_fIh0",
   authDomain: "trading-dashboard-be05e.firebaseapp.com",
   databaseURL: "https://trading-dashboard-be05e-default-rtdb.firebaseio.com",
@@ -2214,7 +2216,9 @@
         smc: $('#tdd-friend-opt-smc').checked,
         volatility: $('#tdd-friend-opt-volatility').checked,
         bigPicture: $('#tdd-friend-opt-bigpicture').checked,
-        confluence: $('#tdd-friend-opt-confluence').checked
+        confluence: $('#tdd-friend-opt-confluence').checked,
+        m15: $('#tdd-friend-opt-m15').checked,
+        extraSmc: $('#tdd-friend-opt-extrasmc').checked
       };
       const preferredProvider = $('#tdd-friend-provider').value;
       const res = await fetch(TRADING_FRIEND_ENDPOINT, {
