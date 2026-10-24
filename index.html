@@ -297,6 +297,23 @@
 .tdd-friend-day::before, .tdd-friend-day::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 .tdd-friend-note { text-align: center; color: var(--text-faint); font-size: 12px; font-style: italic; padding: 18px 10px; }
 .tdd-friend.tdd-friend-adminonly .tdd-friend-toggles,
+.tdd-trades { border-top: 1px solid var(--border); padding: 12px 15px; }
+.tdd-trades-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.tdd-trades-title { font-weight: 600; font-size: 13px; color: var(--amber); }
+.tdd-trades-sub { color: var(--text-faint); font-size: 11px; }
+.tdd-trades-head .tdd-btn { margin-left: auto; }
+.tdd-trade { border: 1px solid var(--border); border-radius: 4px; background: var(--bg); margin-bottom: 6px; cursor: pointer; }
+.tdd-trade-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; font-size: 12px; }
+.tdd-trade-dir { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 3px; letter-spacing: 0.04em; }
+.tdd-trade-dir.long { color: var(--candle-green); border: 1px solid var(--candle-green); }
+.tdd-trade-dir.short { color: var(--candle-red); border: 1px solid var(--candle-red); }
+.tdd-trade-sym { font-weight: 600; }
+.tdd-trade-time { color: var(--text-faint); font-size: 11px; }
+.tdd-trade-nums { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--text-dim); }
+.tdd-trade-detail { display: none; padding: 8px 10px 10px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+.tdd-trade.open .tdd-trade-detail { display: block; }
+.tdd-trades-empty { color: var(--text-faint); font-size: 12px; font-style: italic; }
+.tdd-friend.tdd-friend-adminonly .tdd-trades,
 .tdd-friend.tdd-friend-adminonly .tdd-friend-history-bar,
 .tdd-friend.tdd-friend-adminonly .tdd-friend-input-row,
 .tdd-friend.tdd-friend-adminonly #tdd-friend-quick { display: none; }
@@ -849,8 +866,11 @@
           <label><input type="checkbox" id="tdd-friend-opt-volatility" checked> Volatility &amp; volume</label>
           <label title="Off = previous behaviour. On = every market reply opens with the weekly + daily bias, invalidation level, premium/discount and nearest FVG."><input type="checkbox" id="tdd-friend-opt-bigpicture"> Bigger-picture rule</label>
           <label title="Off = previous behaviour. On = each market reply ends with a checklist of how many of your conditions line up (bias, sweep, structure shift, location, FVG, RSI divergence, reversal candle, volume, room to target). A checklist only — not a probability or a risk size."><input type="checkbox" id="tdd-friend-opt-confluence"> Confluence check</label>
-          <label title="Off = previous behaviour. On = adds an optional 15-minute timeframe for entry timing (crypto and NSE). Higher timeframes still decide the bias."><input type="checkbox" id="tdd-friend-opt-m15"> 15m candles(Nifty only)</label>
-          <label title="Off = previous behaviour. On = adds order blocks and equal highs/lows (liquidity pools) on the daily and 4H as extra key levels."><input type="checkbox" id="tdd-friend-opt-extrasmc"> Extra SMC(Nifty only)</label>
+          <label title="Off = previous behaviour. On = adds an optional 15-minute timeframe for entry timing (crypto and NSE). Higher timeframes still decide the bias."><input type="checkbox" id="tdd-friend-opt-m15"> 15m candles</label>
+          <label title="Off = previous behaviour. On = adds order blocks and equal highs/lows (liquidity pools) on the daily and 4H as extra key levels."><input type="checkbox" id="tdd-friend-opt-extrasmc"> Extra SMC</label>
+          <label title="Off = previous behaviour. On = code computes entry zone, stop, targets and R:R for long and short; the AI must quote them. Every trade it suggests is saved to the Suggested trades list below."><input type="checkbox" id="tdd-friend-opt-trademap"> Trade map</label>
+          <label title="Off = previous behaviour. On = counts how often the nearest support/resistance was tested and whether the bounces are shrinking (a weakening warning)."><input type="checkbox" id="tdd-friend-opt-weaksr"> Weakening S/R</label>
+          <label title="Off = previous behaviour. On = adds Fibonacci retracement zone (0.5–0.705) and extensions (1.272, 1.618) of the latest swing leg; also checked against the trade map entry."><input type="checkbox" id="tdd-friend-opt-fib"> Fibonacci</label>
           <span class="tdd-friend-toggles-label" style="margin-left:auto;">AI provider:</span>
           <select id="tdd-friend-provider" class="tdd-friend-provider-select" title="Which provider to try first — still falls back through the others if it fails.">
             <option value="gemini" selected>Gemini (default)</option>
@@ -875,6 +895,14 @@
         <div class="tdd-friend-input-row">
           <textarea id="tdd-friend-input" placeholder="Ask about current structure, a setup, or paste what you're seeing..." rows="1" disabled></textarea>
           <button class="tdd-btn" id="tdd-friend-send" disabled>Send</button>
+        </div>
+        <div class="tdd-trades" id="tdd-trades">
+          <div class="tdd-trades-head">
+            <span class="tdd-trades-title">Suggested trades</span>
+            <span class="tdd-trades-sub" id="tdd-trades-sub">saved automatically when the Trade map option is on</span>
+            <button class="tdd-btn ghost small" id="tdd-trades-toggle" type="button" style="display:none;">Show all</button>
+          </div>
+          <div id="tdd-trades-list"><div class="tdd-trades-empty">Sign in to see your suggested trades.</div></div>
         </div>
       </div>
     </div>
@@ -1347,20 +1375,23 @@
   // --- playbook ---
   const pbEl = $('#tdd-playbook');
   let customStrategies = [];   // [{id, name, tag, concepts[], img, createdAt}] — synced at strategies/<uid>/custom/<id>
-  let stratEditingId = null, stratImgData = null, stratLoadSeq = 0;
+  let stratEditingId = null, stratEditingBuiltin = null, stratImgData = null, stratLoadSeq = 0;
+  let builtinOverrides = {};   // { <slug of original name>: {name, tag, concepts[], img?} } — synced at strategies/<uid>/overrides/<slug>
+  function effBuiltin(s) { const ov = builtinOverrides[slugify(s.name)]; return ov ? Object.assign({}, s, { name: ov.name, tag: ov.tag, concepts: ov.concepts, img: ov.img || s.img }) : s; }
   function escHtml(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
-  function playCardHtml(s, custom) {
+  function playCardHtml(s, custom, slug, edited) {
     const badgeClass = s.tag === 'long' ? 'badge-long' : (s.tag === 'short' ? 'badge-short' : 'badge-warn');
     const badgeText = s.tag === 'long' ? 'LONG' : (s.tag === 'short' ? 'SHORT' : 'ANTI-PATTERN');
     return (s.img ? '<img src="' + escHtml(s.img) + '" alt="' + escHtml(s.name) + ' reference chart">' : '') +
       '<div class="inner"><div class="head"><div class="name">' + escHtml(s.name) + '</div><div class="badge ' + badgeClass + '">' + badgeText + '</div></div>' +
       '<ul>' + (s.concepts || []).map(c => '<li>' + escHtml(c) + '</li>').join('') + '</ul>' +
       (custom ? '<div class="tdd-custom-actions"><span class="tdd-custom-tag">YOUR STRATEGY</span><button class="tdd-btn ghost small" data-strat-edit="' + escHtml(s.id) + '">Edit</button><button class="tdd-btn ghost small" data-strat-del="' + escHtml(s.id) + '">Delete</button></div>' : '') +
+      (slug ? '<div class="tdd-custom-actions">' + (edited ? '<span class="tdd-custom-tag">EDITED</span>' : '') + '<button class="tdd-btn ghost small" data-bstrat-edit="' + escHtml(slug) + '">Edit</button>' + (edited ? '<button class="tdd-btn ghost small" data-bstrat-reset="' + escHtml(slug) + '">Reset to original</button>' : '') + '</div>' : '') +
       '</div>';
   }
   function renderPlaybook() {
     pbEl.innerHTML = '';
-    STRATEGIES.forEach(s => { const d = document.createElement('div'); d.className = 'tdd-play-card'; d.innerHTML = playCardHtml(s, false); pbEl.appendChild(d); });
+    STRATEGIES.forEach(s => { const d = document.createElement('div'); d.className = 'tdd-play-card'; const slug = slugify(s.name); d.innerHTML = playCardHtml(effBuiltin(s), false, slug, !!builtinOverrides[slug]); pbEl.appendChild(d); });
     customStrategies.forEach(s => { const d = document.createElement('div'); d.className = 'tdd-play-card'; d.innerHTML = playCardHtml(s, true); pbEl.appendChild(d); });
     const n = STRATEGIES.length + customStrategies.length;
     const sub = $('#panel-playbook .tdd-sub');
@@ -1369,8 +1400,9 @@
   renderPlaybook();
 
   function stratStatus(t) { $('#tdd-strat-status').textContent = t || ''; }
-  function openStratForm(st) {
-    stratEditingId = st ? st.id : null;
+  function openStratForm(st, builtinSlug) {
+    stratEditingId = st && !builtinSlug ? st.id : null;
+    stratEditingBuiltin = builtinSlug || null;
     stratImgData = st && st.img ? st.img : null;
     $('#tdd-strat-form-title').textContent = st ? 'Edit strategy' : 'New strategy';
     $('#tdd-strat-name').value = st ? st.name : '';
@@ -1383,7 +1415,7 @@
     $('#tdd-strat-form').classList.add('open');
     $('#tdd-strat-name').focus();
   }
-  function closeStratForm() { $('#tdd-strat-form').classList.remove('open'); stratEditingId = null; stratImgData = null; }
+  function closeStratForm() { $('#tdd-strat-form').classList.remove('open'); stratEditingId = null; stratEditingBuiltin = null; stratImgData = null; }
   async function loadCustomStrategies() {
     if (!currentUser || !db) return;
     const seq = ++stratLoadSeq;
@@ -1393,10 +1425,12 @@
       const v = snap.val() || {};
       customStrategies = Object.keys(v).map(k => ({ id: k, name: v[k].name || '', tag: v[k].tag || 'long', concepts: Array.isArray(v[k].concepts) ? v[k].concepts : [], img: v[k].img || null, createdAt: v[k].createdAt || 0 }))
         .sort((a, b) => a.createdAt - b.createdAt);
+      try { const os = await db.ref('strategies/' + currentUser.uid + '/overrides').once('value'); if (seq === stratLoadSeq) builtinOverrides = os.val() || {}; } catch (e) { /* overrides are optional */ }
+      if (seq !== stratLoadSeq) return;
       renderPlaybook();
     } catch (e) { /* playbook still shows built-ins */ }
   }
-  function clearCustomStrategies() { stratLoadSeq++; customStrategies = []; closeStratForm(); renderPlaybook(); }
+  function clearCustomStrategies() { stratLoadSeq++; customStrategies = []; builtinOverrides = {}; closeStratForm(); renderPlaybook(); }
   async function saveStrategy() {
     if (!currentUser || !db) { openAuthModal(); return; }
     const name = $('#tdd-strat-name').value.trim();
@@ -1405,6 +1439,16 @@
     if (!concepts.length) { stratStatus('add at least one condition'); return; }
     const btn = $('#tdd-strat-save'); btn.disabled = true; stratStatus('saving…');
     try {
+      if (stratEditingBuiltin) {
+        const slug = stratEditingBuiltin;
+        const orig = STRATEGIES.find(x => slugify(x.name) === slug);
+        const rec = { name: name, tag: $('#tdd-strat-tag').value, concepts: concepts, img: (stratImgData && orig && stratImgData !== orig.img) ? stratImgData : null, updatedAt: Date.now() };
+        await db.ref('strategies/' + currentUser.uid + '/overrides/' + slug).set(rec);
+        builtinOverrides[slug] = rec;
+        renderPlaybook(); closeStratForm();
+        $('#tdd-sync-status').textContent = 'Saved your edit to "' + name + '" — the trading friend will use your version.';
+        return;
+      }
       const ref = db.ref('strategies/' + currentUser.uid + '/custom');
       const id = stratEditingId || ref.push().key;
       const prev = customStrategies.find(x => x.id === id);
@@ -1439,6 +1483,20 @@
     reader.readAsDataURL(file);
   });
   pbEl.addEventListener('click', async (ev) => {
+    const bed = ev.target.closest('[data-bstrat-edit]'), brs = ev.target.closest('[data-bstrat-reset]');
+    if (bed) {
+      if (!currentUser) { openAuthModal(); return; }
+      const orig = STRATEGIES.find(x => slugify(x.name) === bed.dataset.bstratEdit);
+      if (orig) { openStratForm(effBuiltin(orig), bed.dataset.bstratEdit); $('#tdd-strat-form-title').textContent = 'Edit built-in strategy'; $('#tdd-strat-form').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      return;
+    }
+    if (brs) {
+      const slug = brs.dataset.bstratReset;
+      if (!currentUser || !confirm('Reset this strategy to the original version?')) return;
+      try { await db.ref('strategies/' + currentUser.uid + '/overrides/' + slug).remove(); delete builtinOverrides[slug]; renderPlaybook(); }
+      catch (e) { alert('Could not reset: ' + (e.message || e)); }
+      return;
+    }
     const ed = ev.target.closest('[data-strat-edit]'), del = ev.target.closest('[data-strat-del]');
     if (ed) { const st = customStrategies.find(x => x.id === ed.dataset.stratEdit); if (st) { openStratForm(st); $('#tdd-strat-form').scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
     if (del) {
@@ -1975,7 +2033,7 @@
         closeAuthModal();
         if (pendingSaveAfterAuth) { pendingSaveAfterAuth = false; doSaveEntry(); }
         if (pendingPlaybookSyncAfterAuth) { pendingPlaybookSyncAfterAuth = false; doSyncPlaybook(); }
-        if (isFriendAdmin()) loadFriendHistory();
+        if (isFriendAdmin()) { loadFriendHistory(); loadSuggestedTrades(); }
         loadPlan();
         loadFeeSetting();
         loadCustomStrategies();
@@ -1989,6 +2047,7 @@
         clearFriendMessages();
         friendHistory = [];
         $('#tdd-friend-count').textContent = '';
+        suggestedTrades = []; tradesLoadSeq++; renderSuggestedTrades();
       }
     });
   } else {
@@ -2184,12 +2243,63 @@
     }
   }
 
+
+  // --- suggested trades: the trade map's levels are saved on the assistant message (chats/<uid>/<id>/trade) ---
+  let suggestedTrades = [], tradesShowAll = false, tradesLoadSeq = 0;
+  function fmtNum(n) { return (n == null || isNaN(n)) ? 'n/a' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+  async function loadSuggestedTrades() {
+    if (!currentUser || !db) return;
+    const seq = ++tradesLoadSeq;
+    try {
+      const snap = await db.ref('chats/' + currentUser.uid).orderByChild('ts').limitToLast(600).once('value');
+      if (seq !== tradesLoadSeq) return;
+      const out = [];
+      snap.forEach(child => { const v = child.val(); if (v && v.trade && v.trade.dir) out.push({ id: child.key, ts: v.ts || 0, symbol: v.symbol || '', trade: v.trade }); });
+      out.sort((a, b) => b.ts - a.ts);
+      suggestedTrades = out;
+      renderSuggestedTrades();
+    } catch (e) {
+      $('#tdd-trades-list').innerHTML = '<div class="tdd-trades-empty">Could not load suggested trades: ' + escHtml(e.message || e) + '</div>';
+    }
+  }
+  function renderSuggestedTrades() {
+    const list = $('#tdd-trades-list'), btn = $('#tdd-trades-toggle');
+    if (!list) return;
+    if (!currentUser) { list.innerHTML = '<div class="tdd-trades-empty">Sign in to see your suggested trades.</div>'; btn.style.display = 'none'; return; }
+    if (!suggestedTrades.length) { list.innerHTML = '<div class="tdd-trades-empty">No suggested trades yet — tick "Trade map" and ask for a trade idea; each long/short it suggests is saved here.</div>'; btn.style.display = 'none'; return; }
+    const shown = tradesShowAll ? suggestedTrades : suggestedTrades.slice(0, 5);
+    btn.style.display = suggestedTrades.length > 5 ? '' : 'none';
+    btn.textContent = tradesShowAll ? 'Show last 5' : 'Show all (' + suggestedTrades.length + ')';
+    $('#tdd-trades-sub').textContent = 'showing ' + shown.length + ' of ' + suggestedTrades.length + ' — click a row for details';
+    list.innerHTML = shown.map(x => {
+      const t = x.trade, d = new Date(x.ts);
+      const t1 = (t.targets && t.targets[0]) || null;
+      const risk = (t.entry != null && t.stop != null) ? Math.abs(t.entry - t.stop) : null;
+      const isIndia = /^(NSE|BSE):/i.test(x.symbol || '');
+      const fee = (!isIndia && risk) ? ' · fees ≈ ' + (feePoints / risk).toFixed(2) + 'R' : '';
+      const targets = (t.targets || []).map((g, i) => 'T' + (i + 1) + ' ' + fmtNum(g.price) + ' (' + escHtml(g.label) + ') → ' + (g.rr != null ? g.rr + 'R' : 'n/a')).join('<br>');
+      return '<div class="tdd-trade" data-trade="' + escHtml(x.id) + '"><div class="tdd-trade-main">' +
+        '<span class="tdd-trade-dir ' + (t.dir === 'short' ? 'short' : 'long') + '">' + (t.dir === 'short' ? 'SHORT' : 'LONG') + '</span>' +
+        '<span class="tdd-trade-sym">' + escHtml(t.symbol || x.symbol) + '</span>' +
+        '<span class="tdd-trade-time">' + escHtml(d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })) + '</span>' +
+        '<span class="tdd-trade-nums">entry ' + fmtNum(t.entry) + ' · stop ' + fmtNum(t.stop) + (t1 ? ' · T1 ' + fmtNum(t1.price) + (t1.rr != null ? ' (' + t1.rr + 'R)' : '') : '') + fee + '</span>' +
+        '</div><div class="tdd-trade-detail">' +
+        'Entry: ' + escHtml(t.entryNote || '') + '<br>' +
+        'Price when suggested: ' + fmtNum(t.price) + (risk ? ' · risk ' + fmtNum(risk) + ' pts' : '') + '<br>' +
+        (targets ? targets + '<br>' : '') +
+        'Verdict: ' + escHtml(t.verdict || '') + (t.fibNote ? '<br>Fib: ' + escHtml(t.fibNote) : '') +
+        '</div></div>';
+    }).join('');
+  }
+  $('#tdd-trades-toggle').addEventListener('click', () => { tradesShowAll = !tradesShowAll; renderSuggestedTrades(); });
+  $('#tdd-trades-list').addEventListener('click', (ev) => { const row = ev.target.closest('.tdd-trade'); if (row) row.classList.toggle('open'); });
+
   async function saveFriendExchange(userText, userTs, reply, replyTs, data) {
     if (!currentUser || !db) return;
     try {
       const ref = db.ref('chats/' + currentUser.uid);
       await ref.push({ role: 'user', content: userText, ts: userTs, symbol: tvSymbol });
-      await ref.push({ role: 'assistant', content: reply, ts: replyTs, symbol: tvSymbol, provider: data.aiProvider || null, model: data.aiModel || null });
+      await ref.push(Object.assign({ role: 'assistant', content: reply, ts: replyTs, symbol: tvSymbol, provider: data.aiProvider || null, model: data.aiModel || null }, data.trade ? { trade: data.trade } : {}));
     } catch (e) {
       appendFriendMsg('error', "This exchange couldn't be saved to your history: " + (e.message || e) + ' — check the Firebase rules for "chats".');
     }
@@ -2218,7 +2328,10 @@
         bigPicture: $('#tdd-friend-opt-bigpicture').checked,
         confluence: $('#tdd-friend-opt-confluence').checked,
         m15: $('#tdd-friend-opt-m15').checked,
-        extraSmc: $('#tdd-friend-opt-extrasmc').checked
+        extraSmc: $('#tdd-friend-opt-extrasmc').checked,
+        tradeMap: $('#tdd-friend-opt-trademap').checked,
+        weakSR: $('#tdd-friend-opt-weaksr').checked,
+        fib: $('#tdd-friend-opt-fib').checked
       };
       const preferredProvider = $('#tdd-friend-provider').value;
       const res = await fetch(TRADING_FRIEND_ENDPOINT, {
@@ -2238,7 +2351,7 @@
       const repliedAt = Date.now();
       appendFriendMsg('assistant', reply, modelTag, repliedAt);
       friendHistory.push({ role: 'assistant', content: reply });
-      saveFriendExchange(text, sentAt, reply, repliedAt, data);
+      saveFriendExchange(text, sentAt, reply, repliedAt, data).then(() => { if (data.trade) loadSuggestedTrades(); });
     } catch (e) {
       removeFriendTyping();
       appendFriendMsg('error', 'Could not reach the trading friend backend. ' + (e.message || e));
@@ -2277,7 +2390,7 @@
   // Permanently deletes every saved message at chats/<uid> (not just the date range on screen).
   $('#tdd-friend-clear').addEventListener('click', async () => {
     if (!currentUser || !db) { openAuthModal(); return; }
-    if (!confirm('Delete ALL saved chat history from your account?\n\nThis removes every message in the database (not just the date range shown) and can\'t be undone. Your journal, strategies and plan are not affected.')) return;
+    if (!confirm('Delete ALL saved chat history from your account?\n\nThis removes every message in the database (not just the date range shown) — including the Suggested trades list, which is stored in it — and can\'t be undone. Your journal, strategies and plan are not affected.')) return;
     const btn = $('#tdd-friend-clear');
     btn.disabled = true;
     friendLoadSeq++; // drop any history load still in flight so it can't repaint old messages
@@ -2285,6 +2398,7 @@
       await db.ref('chats/' + currentUser.uid).remove();
       clearFriendMessages();
       friendHistory = [];
+      suggestedTrades = []; renderSuggestedTrades();
       $('#tdd-friend-count').textContent = '0 messages';
       setFriendNote('Chat history deleted. New messages will start a fresh history.');
     } catch (e) {
