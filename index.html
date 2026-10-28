@@ -868,7 +868,7 @@
           <label title="Off = previous behaviour. On = each market reply ends with a checklist of how many of your conditions line up (bias, sweep, structure shift, location, FVG, RSI divergence, reversal candle, volume, room to target). A checklist only — not a probability or a risk size."><input type="checkbox" id="tdd-friend-opt-confluence"> Confluence check</label>
           <label title="Off = previous behaviour. On = adds an optional 15-minute timeframe for entry timing (crypto and NSE). Higher timeframes still decide the bias."><input type="checkbox" id="tdd-friend-opt-m15"> 15m candles</label>
           <label title="Off = previous behaviour. On = adds order blocks and equal highs/lows (liquidity pools) on the daily and 4H as extra key levels."><input type="checkbox" id="tdd-friend-opt-extrasmc"> Extra SMC</label>
-          <label title="Off = previous behaviour. On = code computes entry zone, stop, targets and R:R for long and short; the AI must quote them. Every trade it suggests is saved to the Suggested trades list below."><input type="checkbox" id="tdd-friend-opt-trademap" checked> Trade map</label>
+          <label title="Off = previous behaviour. On = code computes entry zone, stop, targets and R:R for long and short; the AI must quote them. Every trade it suggests is saved to the Suggested trades list below."><input type="checkbox" id="tdd-friend-opt-trademap"> Trade map</label>
           <label title="Off = previous behaviour. On = counts how often the nearest support/resistance was tested and whether the bounces are shrinking (a weakening warning)."><input type="checkbox" id="tdd-friend-opt-weaksr"> Weakening S/R</label>
           <label title="Off = previous behaviour. On = adds Fibonacci retracement zone (0.5–0.705) and extensions (1.272, 1.618) of the latest swing leg; also checked against the trade map entry."><input type="checkbox" id="tdd-friend-opt-fib"> Fibonacci</label>
           <span class="tdd-friend-toggles-label" style="margin-left:auto;">AI provider:</span>
@@ -1394,6 +1394,7 @@
     STRATEGIES.forEach(s => { const d = document.createElement('div'); d.className = 'tdd-play-card'; const slug = slugify(s.name); d.innerHTML = playCardHtml(effBuiltin(s), false, slug, !!builtinOverrides[slug]); pbEl.appendChild(d); });
     customStrategies.forEach(s => { const d = document.createElement('div'); d.className = 'tdd-play-card'; d.innerHTML = playCardHtml(s, true); pbEl.appendChild(d); });
     const n = STRATEGIES.length + customStrategies.length;
+    rebuildSetupSelect();
     const sub = $('#panel-playbook .tdd-sub');
     if (sub) sub.innerHTML = 'The ' + STRATEGIES.length + ' setups you already defined as working' + (customStrategies.length ? ', plus ' + customStrategies.length + ' you added' : '') + ', with reference charts. If a trade doesn\'t match one of these, it isn\'t a setup — it\'s the ' + (n + 1) + 'th entry, and that one has never worked.';
   }
@@ -1841,17 +1842,21 @@
     if (cfg) el.innerHTML = patternSvg(cfg);
   });
 
-  // --- setup select ---
+  // --- setup select --- (rebuilt whenever the playbook changes: built-ins as edited + your own strategies)
+  function rebuildSetupSelect() {
+    const sel = document.getElementById('f-setup');
+    if (!sel) return;
+    const keep = sel.value;
+    sel.innerHTML = '';
+    const none = document.createElement('option');
+    none.value = ''; none.textContent = 'None of these (forced trade)';
+    sel.appendChild(none);
+    const names = STRATEGIES.map(x => effBuiltin(x).name).concat(customStrategies.map(x => x.name));
+    names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+    sel.value = names.indexOf(keep) >= 0 ? keep : '';
+  }
+  rebuildSetupSelect();
   const setupSel = $('#f-setup');
-  STRATEGIES.forEach(s => {
-    const o = document.createElement('option');
-    o.value = s.name; o.textContent = s.name;
-    setupSel.appendChild(o);
-  });
-  const noneOpt = document.createElement('option');
-  noneOpt.value = ''; noneOpt.textContent = 'None of these (forced trade)';
-  setupSel.insertBefore(noneOpt, setupSel.firstChild);
-  setupSel.value = '';
 
   // --- mistake checkboxes in form ---
   const mcEl = $('#tdd-mistake-checks');
