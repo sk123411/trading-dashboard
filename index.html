@@ -297,6 +297,9 @@
 .tdd-friend-day::before, .tdd-friend-day::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 .tdd-friend-note { text-align: center; color: var(--text-faint); font-size: 12px; font-style: italic; padding: 18px 10px; }
 .tdd-friend.tdd-friend-adminonly .tdd-friend-toggles,
+.tdd-copybox { border-top: 1px solid var(--border); padding: 10px 15px; }
+.tdd-copybox textarea { width: 100%; box-sizing: border-box; margin-top: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 8px; }
+.tdd-friend.tdd-friend-adminonly .tdd-copybox { display: none !important; }
 .tdd-trades { border-top: 1px solid var(--border); padding: 12px 15px; }
 .tdd-trades-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .tdd-trades-title { font-weight: 600; font-size: 13px; color: var(--amber); }
@@ -894,7 +897,17 @@
         </div>
         <div class="tdd-friend-input-row">
           <textarea id="tdd-friend-input" placeholder="Ask about current structure, a setup, or paste what you're seeing..." rows="1" disabled></textarea>
+          <button class="tdd-btn ghost" id="tdd-friend-copy" disabled title="Builds the full prompt (playbook, candles, computed levels, journal) without calling any AI, so you can paste it into your own claude.ai chat.">Copy for Claude</button>
           <button class="tdd-btn" id="tdd-friend-send" disabled>Send</button>
+        </div>
+        <div class="tdd-copybox" id="tdd-copybox" style="display:none;">
+          <div class="tdd-trades-sub" id="tdd-copybox-msg"></div>
+          <textarea id="tdd-copybox-text" readonly rows="6"></textarea>
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <button class="tdd-btn small" id="tdd-copybox-copy" type="button">Copy again</button>
+            <button class="tdd-btn ghost small" id="tdd-copybox-open" type="button">Open claude.ai</button>
+            <button class="tdd-btn ghost small" id="tdd-copybox-close" type="button">Close</button>
+          </div>
         </div>
         <div class="tdd-trades" id="tdd-trades">
           <div class="tdd-trades-head">
@@ -1963,7 +1976,7 @@
   // Fill in your own project's config (Firebase console → Project settings → General → Your apps → SDK setup).
   // This is a public client config, not a secret — real protection comes from the Realtime Database
   // security rules (see FIREBASE_SETUP.md), which restrict each account to its own "positions/<uid>" node.
-  const firebaseConfig = {
+ const firebaseConfig = {
   apiKey: "AIzaSyAb2s0CBOVR8DBhlCVPJZpQ21XMZh_fIh0",
   authDomain: "trading-dashboard-be05e.firebaseapp.com",
   databaseURL: "https://trading-dashboard-be05e-default-rtdb.firebaseio.com",
@@ -2076,6 +2089,7 @@
     const locked = $('#tdd-friend-locked');
     const input = $('#tdd-friend-input');
     const send = $('#tdd-friend-send');
+    const copyBtn = $('#tdd-friend-copy');
     const quick = $('#tdd-friend-quick');
     if (!gate) return;
     const admin = isFriendAdmin();
@@ -2084,6 +2098,7 @@
     $('.tdd-friend').classList.toggle('tdd-friend-adminonly', !!currentUser && !admin);
     input.disabled = !admin;
     send.disabled = !admin;
+    copyBtn.disabled = !admin;
     quick.disabled = !admin;
   }
   const friendSigninBtn = document.getElementById('tdd-friend-signin');
@@ -2385,6 +2400,47 @@
   $('#tdd-friend-quick').addEventListener('click', () => {
     sendFriendMessage("What's your take on the current market structure on " + tvSymbol.split(':').pop() + "? Give me your best trade if there is one.");
   });
+
+
+  // --- "Copy for Claude": same request as Send, but the Worker returns the prompt instead of calling an AI ---
+  function friendAnalysisOpts() {
+    return {
+      structure: $('#tdd-friend-opt-structure').checked, smc: $('#tdd-friend-opt-smc').checked, volatility: $('#tdd-friend-opt-volatility').checked,
+      bigPicture: $('#tdd-friend-opt-bigpicture').checked, confluence: $('#tdd-friend-opt-confluence').checked, m15: $('#tdd-friend-opt-m15').checked,
+      extraSmc: $('#tdd-friend-opt-extrasmc').checked, tradeMap: $('#tdd-friend-opt-trademap').checked, weakSR: $('#tdd-friend-opt-weaksr').checked, fib: $('#tdd-friend-opt-fib').checked
+    };
+  }
+  async function copyTextToClipboard(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+    try { const ta = $('#tdd-copybox-text'); ta.focus(); ta.select(); return document.execCommand('copy'); } catch (e) { return false; }
+  }
+  async function copyForClaude() {
+    if (friendBusy) return;
+    if (!currentUser) { openAuthModal(); return; }
+    if (!isFriendAdmin()) return;
+    if (!TRADING_FRIEND_ENDPOINT || TRADING_FRIEND_ENDPOINT.indexOf('YOUR-WORKER-SUBDOMAIN') !== -1) { appendFriendMsg('error', "Trading friend isn't connected yet — see SETUP.md."); return; }
+    const typed = friendInput.value.trim();
+    const question = typed || ("What's your take on the current market structure on " + tvSymbol.split(':').pop() + "? Give me your best trade if there is one.");
+    const btn = $('#tdd-friend-copy'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Building…';
+    const box = $('#tdd-copybox');
+    try {
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch(TRADING_FRIEND_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: idToken, message: question, symbol: tvSymbol, analysis: friendAnalysisOpts(), promptOnly: true }) });
+      let data = {}; try { data = await res.json(); } catch (e) {}
+      if (!res.ok || data.error || !data.prompt) { appendFriendMsg('error', data.error || (res.ok ? 'The Worker did not return a prompt — deploy the latest Worker (src/index.js).' : 'Request failed (HTTP ' + res.status + ').')); return; }
+      $('#tdd-copybox-text').value = data.prompt;
+      box.style.display = 'block';
+      const ok = await copyTextToClipboard(data.prompt);
+      $('#tdd-copybox-msg').textContent = (ok ? 'Copied to your clipboard' : 'Could not copy automatically — select the text below and copy it') + ' (' + data.prompt.length.toLocaleString() + ' characters). Paste it into a new chat on claude.ai. Nothing was sent to any AI and nothing was saved.';
+    } catch (e) {
+      appendFriendMsg('error', 'Could not reach the trading friend backend. ' + (e.message || e));
+    } finally { btn.textContent = old; btn.disabled = !isFriendAdmin(); }
+  }
+  $('#tdd-friend-copy').addEventListener('click', copyForClaude);
+  $('#tdd-copybox-copy').addEventListener('click', async () => { const ok = await copyTextToClipboard($('#tdd-copybox-text').value); $('#tdd-copybox-msg').textContent = ok ? 'Copied again.' : 'Could not copy automatically — select the text and copy it.'; });
+  $('#tdd-copybox-open').addEventListener('click', () => { window.open('https://claude.ai/new', '_blank', 'noopener'); });
+  $('#tdd-copybox-close').addEventListener('click', () => { $('#tdd-copybox').style.display = 'none'; });
 
   // history date filter: defaults to the last 5 days
   function setFriendFromDays(daysBack) {
