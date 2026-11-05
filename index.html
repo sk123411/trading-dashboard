@@ -297,6 +297,13 @@
 .tdd-friend-day::before, .tdd-friend-day::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 .tdd-friend-note { text-align: center; color: var(--text-faint); font-size: 12px; font-style: italic; padding: 18px 10px; }
 .tdd-friend.tdd-friend-adminonly .tdd-friend-toggles,
+.tdd-import { background: var(--bg-panel); border: 1px solid var(--border); border-left: 3px solid var(--teal); border-radius: 4px; padding: 14px 16px; margin-bottom: 14px; }
+.tdd-import table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 10px; }
+.tdd-import th, .tdd-import td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.tdd-import th { color: var(--text-faint); font-weight: 500; text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; }
+.tdd-import tr.dup td { opacity: 0.45; }
+.tdd-import .tdd-imp-scroll { overflow-x: auto; }
+.tdd-needs-badge { color: var(--amber); font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; }
 .tdd-copybox { border-top: 1px solid var(--border); padding: 10px 15px; }
 .tdd-copybox textarea { width: 100%; box-sizing: border-box; margin-top: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 8px; }
 .tdd-friend.tdd-friend-adminonly .tdd-copybox { display: none !important; }
@@ -1093,6 +1100,7 @@
       <div class="tdd-verdict v-green" id="tdd-verdict"></div>
 
       <div id="tdd-editing-banner" style="display:none; margin-bottom:10px; padding:10px 14px; border:1px solid var(--amber); border-radius:4px; color:var(--amber); font-size:13px;">Editing an existing trade — saving will update this entry instead of creating a new one.</div>
+      <div class="tdd-pnl-note" id="tdd-import-edit-note" style="display:none; color:var(--amber);">Imported trade — date, prices, direction and result came from your file. Fill in the setup, checks, mistakes and Plan B below; the radio buttons start at their defaults, so review them rather than trusting them.</div>
       <button class="tdd-btn" id="tdd-save">Save entry to journal</button>
       <button class="tdd-btn ghost" id="tdd-cancel-edit" type="button" style="display:none; margin-left:8px;">Cancel edit</button>
     </div>
@@ -1102,6 +1110,24 @@
       <h1 class="tdd-h1">Journal history</h1>
       <p class="tdd-sub">Every entry you've logged, most recent first. This is the record — don't edit your memory of a trade after the fact.</p>
       <div id="tdd-pnl-summary" class="tdd-pnl-wrap"></div>
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+        <button class="tdd-btn small" id="tdd-import-open" type="button">Import trades (Excel / CSV)</button>
+        <label class="tdd-check" style="font-size:12px; color:var(--text-dim);"><input type="checkbox" id="tdd-filter-needs"> Show only imported trades that still need details</label>
+      </div>
+      <div class="tdd-import" id="tdd-import" style="display:none;">
+        <div class="tdd-pnl-title">Import trades from your exchange file</div>
+        <p class="tdd-pnl-note">Pick your order-history export (.xlsx, .xls or .csv). Your buys and sells are paired into whole trades; stop-loss and target are read from the orders cancelled when a position closed, when the file has them. Nothing is saved until you press Import.</p>
+        <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-top:8px;">
+          <div class="tdd-field" style="margin:0;"><label>file</label><input type="file" id="tdd-import-file" accept=".csv,.xls,.xlsx,.xlsm"></div>
+          <div class="tdd-field" style="margin:0;"><label>account size then (optional — same currency as the file)</label><input type="number" id="tdd-import-capital" min="0" step="any" placeholder="e.g. 1000"></div>
+        </div>
+        <p class="tdd-pnl-note" id="tdd-import-msg"></p>
+        <div class="tdd-imp-scroll" id="tdd-import-table"></div>
+        <div style="margin-top:10px; display:flex; gap:8px;">
+          <button class="tdd-btn" id="tdd-import-go" type="button" disabled>Import selected</button>
+          <button class="tdd-btn ghost" id="tdd-import-close" type="button">Close</button>
+        </div>
+      </div>
       <div id="tdd-entries"></div>
       <button class="tdd-btn ghost small" id="tdd-clear-all" style="margin-top:10px;">Clear all entries</button>
     </div>
@@ -1977,7 +2003,7 @@
   // Fill in your own project's config (Firebase console → Project settings → General → Your apps → SDK setup).
   // This is a public client config, not a secret — real protection comes from the Realtime Database
   // security rules (see FIREBASE_SETUP.md), which restrict each account to its own "positions/<uid>" node.
-  const firebaseConfig = {
+ const firebaseConfig = {
   apiKey: "AIzaSyAb2s0CBOVR8DBhlCVPJZpQ21XMZh_fIh0",
   authDomain: "trading-dashboard-be05e.firebaseapp.com",
   databaseURL: "https://trading-dashboard-be05e-default-rtdb.firebaseio.com",
@@ -2010,7 +2036,7 @@
       // trade with no mistakes checked), so `mistakes`/`marksDrawn` can come back as undefined.
       // Default them here so rendering never crashes on a missing field.
       .map(k => Object.assign({ id: k, mistakes: [], marksDrawn: [] }, val[k]))
-      .sort((a, b) => b.id.localeCompare(a.id)); // Firebase push keys sort chronologically — newest first
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.id.localeCompare(a.id)); // newest trade date first; push keys break ties
   }
 
   function attachPositionsListener(uid) {
@@ -2670,6 +2696,7 @@
 
   function resetForm() {
     editingId = null;
+    $('#tdd-import-edit-note').style.display = 'none';
     $('#f-date').value = new Date().toISOString().slice(0,10);
     $('#f-symbol').value=''; $('#f-entry').value=''; $('#f-sl').value=''; $('#f-target').value=''; $('#f-rr').value=''; $('#f-notes').value=''; $('#f-planb').value='';
     $('#f-direction').value = 'Long';
@@ -2746,6 +2773,7 @@
     const entry = entries.find(x => x.id === id);
     if (!entry) return;
     populateFormFromEntry(entry);
+    $('#tdd-import-edit-note').style.display = entry.needsDetails ? 'block' : 'none';
     editingId = id;
     setEditModeUI(true);
     goTab('log');
@@ -2760,6 +2788,7 @@
         const original = entries.find(x => x.id === editingId);
         if (original && original.createdAt) entry.createdAt = original.createdAt;
         entry.updatedAt = Date.now();
+        if (original && original.needsDetails) entry.needsDetails = null;
         await db.ref('positions/' + currentUser.uid + '/' + editingId).update(entry);
       } else {
         await db.ref('positions/' + currentUser.uid).push(entry);
@@ -2780,6 +2809,237 @@
     doSaveEntry();
   });
   $('#tdd-cancel-edit').addEventListener('click', resetForm);
+
+  // --- trade import: exchange fills file (CSV / Excel) -> whole trades ---
+  const TDDImport = (function () {
+    const norm = h => String(h == null ? '' : h).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const ALIASES = {
+      time: ['time', 'date', 'tradedate', 'executiontime', 'orderexecutiontime', 'timestamp', 'datetime', 'filltime', 'createdat'],
+      symbol: ['contract', 'symbol', 'tradingsymbol', 'instrument', 'pair', 'market', 'product'],
+      side: ['side', 'tradetype', 'buysell', 'type', 'transactiontype', 'direction'],
+      qty: ['qty', 'quantity', 'size', 'filledqty', 'amount'],
+      price: ['execprice', 'price', 'avgprice', 'averageprice', 'tradeprice', 'executionprice', 'fillprice'],
+      fee: ['tradingfees', 'fees', 'fee', 'commission', 'brokerage'],
+      orderValue: ['ordervalue', 'value', 'tradevalue', 'notional'],
+      status: ['status', 'orderstatus'],
+      stop: ['stopprice', 'triggerprice'],
+      explanation: ['explanation', 'reason'],
+      orderType: ['ordertype'],
+      filled: ['filledremaining']
+    };
+    // Small CSV parser (quotes, commas, newlines inside quotes).
+    function parseCSV(text) {
+      const rows = []; let row = [], cur = '', q = false;
+      text = String(text).replace(/^﻿/, '');
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+        else if (c === '"') q = true;
+        else if (c === ',') { row.push(cur); cur = ''; }
+        else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cur); cur = ''; if (row.some(x => x !== '')) rows.push(row); row = []; }
+        else cur += c;
+      }
+      row.push(cur); if (row.some(x => x !== '')) rows.push(row);
+      return rows;
+    }
+    const num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isNaN(n) ? null : n; };
+    // "2026-10-10 09:32:53.809567+05:30 IST Asia/Kolkata" -> { ms, date }
+    function parseTime(s) {
+      s = String(s == null ? '' : s).trim();
+      const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)(\.\d+)?\s*(Z|[+-]\d{2}:?\d{2})?/.exec(s);
+      if (m) {
+        let off = m[4] || '';
+        if (/^[+-]\d{4}$/.test(off)) off = off.slice(0, 3) + ':' + off.slice(3);
+        const t = m[2].length === 5 ? m[2] + ':00' : m[2];
+        const ms = Date.parse(m[1] + 'T' + t + (m[3] ? m[3].slice(0, 4) : '') + off);
+        return isNaN(ms) ? null : { ms: ms, date: m[1] };
+      }
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return null;
+      return { ms: d.getTime(), date: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') };
+    }
+    // matrix (array of arrays) -> { fills, stops, problem }
+    function toRecords(matrix) {
+      if (!matrix || matrix.length < 2) return { fills: [], stops: [], problem: 'The file has no rows.' };
+      // the header is the first of the top rows that names at least 3 known columns (skips title rows)
+      const score = row => { const h = row.map(norm); return Object.keys(ALIASES).filter(k => ALIASES[k].some(a => h.indexOf(a) >= 0)).length; };
+      let hi = 0;
+      for (let i = 0; i < Math.min(matrix.length, 15); i++) { if (score(matrix[i]) >= 3) { hi = i; break; } }
+      matrix = matrix.slice(hi);
+      const head = matrix[0].map(norm), col = {};
+      Object.keys(ALIASES).forEach(k => { for (const a of ALIASES[k]) { const i = head.indexOf(a); if (i >= 0) { col[k] = i; break; } } });
+      const missing = ['time', 'symbol', 'side', 'qty', 'price'].filter(k => col[k] == null);
+      if (missing.length) return { fills: [], stops: [], problem: 'Could not find these columns: ' + missing.join(', ') + '. Found: ' + matrix[0].filter(Boolean).join(', ') };
+      const get = (r, k) => (col[k] == null ? '' : r[col[k]]);
+      const fills = [], stops = [];
+      for (let ri = 1; ri < matrix.length; ri++) {
+        const r = matrix[ri];
+        const t = parseTime(get(r, 'time'));
+        const side = String(get(r, 'side')).trim().toLowerCase();
+        const status = String(get(r, 'status')).trim().toLowerCase();
+        const isBuy = side === 'buy' || side === 'b', isSell = side === 'sell' || side === 's';
+        if (!t || (!isBuy && !isSell)) continue;
+        const sgn = isBuy ? 1 : -1, symbol = String(get(r, 'symbol')).trim();
+        if (/cancel|reject|expire/.test(status)) {
+          const sp = num(get(r, 'stop'));
+          if (sp && /position_closed|closed/.test(String(get(r, 'explanation')).toLowerCase())) stops.push({ ms: t.ms, symbol: symbol, sgn: sgn, price: sp });
+          continue;
+        }
+        if (status && !/closed|filled|complete|executed|done|trade/.test(status)) continue;
+        let qty = num(get(r, 'qty'));
+        const fr = String(get(r, 'filled')).split('/')[0];
+        if (col.filled != null && num(fr) != null) qty = num(fr);
+        const price = num(get(r, 'price'));
+        if (!(qty > 0) || !(price > 0)) continue;
+        const ov = num(get(r, 'orderValue'));
+        fills.push({ ms: t.ms, date: t.date, symbol: symbol, sgn: sgn, qty: qty, price: price, fee: Math.abs(num(get(r, 'fee')) || 0), cv: ov && ov > 0 ? ov / (qty * price) : null, orderType: String(get(r, 'orderType')).toLowerCase(), stop: num(get(r, 'stop')), explanation: String(get(r, 'explanation')).toLowerCase(), seq: ri });
+      }
+      return { fills: fills, stops: stops, problem: fills.length ? null : 'No filled buy/sell rows were found in this file.' };
+    }
+    // fills -> trades (position goes flat = one trade; a fill that flips the position is split)
+    function buildTrades(fills, stops) {
+      const bySym = {};
+      fills.forEach(f => { (bySym[f.symbol] = bySym[f.symbol] || []).push(f); });
+      const trades = [];
+      Object.keys(bySym).forEach(sym => {
+        const list = bySym[sym].slice().sort((a, b) => a.ms - b.ms || a.seq - b.seq);
+        const cv = (list.find(f => f.cv) || { cv: 1 }).cv;
+        let pos = 0, cur = null;
+        const finish = (open) => {
+          if (!cur) return;
+          const qIn = cur.ins.reduce((t, x) => t + x.q, 0), qOut = cur.outs.reduce((t, x) => t + x.q, 0);
+          const entry = cur.ins.reduce((t, x) => t + x.q * x.p, 0) / qIn;
+          const exit = qOut ? cur.outs.reduce((t, x) => t + x.q * x.p, 0) / qOut : null;
+          const tr = { symbol: sym, dir: cur.dir > 0 ? 'Long' : 'Short', qty: qIn, entry: entry, exit: exit, entryMs: cur.ins[0].ms, exitMs: qOut ? cur.outs[cur.outs.length - 1].ms : null, date: cur.ins[0].date, fee: cur.fee, cv: cv, open: !!open, liquidated: cur.outs.some(o => /liquidat/.test(o.expl)), sl: null, tp: null, inferred: false };
+          if (!open) {
+            tr.gross = cur.dir * (exit - entry) * qOut * cv;
+            const closeSgn = -cur.dir, exitMs = tr.exitMs;
+            const cands = stops.filter(s => s.symbol === sym && s.sgn === closeSgn && s.ms >= exitMs - 2000 && s.ms <= exitMs + 5000).map(s => s.price);
+            cur.outs.forEach(o => { if (o.stopPrice && /stop/.test(o.ot)) cands.push(o.stopPrice); });
+            const loss = cands.filter(p => cur.dir > 0 ? p < entry : p > entry).sort((a, b) => Math.abs(a - entry) - Math.abs(b - entry));
+            const win = cands.filter(p => cur.dir > 0 ? p > entry : p < entry).sort((a, b) => Math.abs(a - entry) - Math.abs(b - entry));
+            if (loss.length) { tr.sl = loss[0]; tr.inferred = true; }
+            if (win.length) { tr.tp = win[0]; tr.inferred = true; }
+          }
+          tr.key = sym + '|' + new Date(tr.entryMs).toISOString() + '|' + tr.dir + '|' + (+qIn.toFixed(8));
+          trades.push(tr); cur = null;
+        };
+        list.forEach(f => {
+          let rem = f.qty;
+          while (rem > 1e-12) {
+            const share = take => f.fee * (take / f.qty);
+            if (pos === 0 || Math.sign(pos) === f.sgn) {
+              if (!cur) cur = { dir: f.sgn, ins: [], outs: [], fee: 0 };
+              cur.ins.push({ q: rem, p: f.price, ms: f.ms, date: f.date }); cur.fee += share(rem); pos += f.sgn * rem; rem = 0;
+            } else {
+              const take = Math.min(rem, Math.abs(pos));
+              cur.outs.push({ q: take, p: f.price, ms: f.ms, ot: f.orderType, stopPrice: f.stop, expl: f.explanation }); cur.fee += share(take); pos += f.sgn * take; rem -= take;
+              if (Math.abs(pos) < 1e-12) { pos = 0; finish(false); }
+            }
+          }
+        });
+        if (cur) finish(true);
+      });
+      return trades.sort((a, b) => a.entryMs - b.entryMs);
+    }
+    // trade -> journal entry (capital > 0 converts currency P&L / fees / risk to % of capital)
+    function toEntry(t, capital, fileName) {
+      const r2 = (n, d) => { const k = Math.pow(10, d); return Math.round(n * k) / k; };
+      const pnlUnits = t.open ? null : t.gross;
+      const outcome = t.open ? 'open' : (t.liquidated ? 'liquidated' : (pnlUnits > 0 ? 'win' : pnlUnits < 0 ? 'loss' : 'breakeven'));
+      const e = { date: t.date, symbol: t.symbol, direction: t.dir, htf: '', setup: '', leverage: '', entry: String(r2(t.entry, 8)), sl: t.sl != null ? String(t.sl) : '', target: t.tp != null ? String(t.tp) : '', rr: '', risk: '', retest: '', rangeCheck: '', reversalTrendCheck: '', chartPattern: '', bigWin: false, marksDrawn: [], outcome: outcome, pnlPct: '', daily: '', candleClosed: '', goodLevel: '', bias: '', mistakes: [], planB: '', source: 'import', needsDetails: true, importKey: t.key, createdAt: t.exitMs || t.entryMs };
+      if (t.sl != null && t.tp != null && t.sl !== t.entry) e.rr = '1 : ' + (Math.abs(t.tp - t.entry) / Math.abs(t.entry - t.sl)).toFixed(2);
+      if (capital > 0) {
+        if (pnlUnits != null) e.pnlPct = r2(pnlUnits / capital * 100, 3);
+        if (t.sl != null) e.risk = String(r2(Math.abs(t.entry - t.sl) * t.qty * t.cv / capital * 100, 2));
+        e.feePct = r2(t.fee / capital * 100, 4);
+      }
+      const bits = ['Imported' + (fileName ? ' from ' + fileName : ''), 'qty ' + r2(t.qty, 8), t.exit != null ? 'exit ' + r2(t.exit, 8) + ' (' + new Date(t.exitMs).toLocaleString() + ')' : 'still open — no exit in the file', 'fees ' + r2(t.fee, 6) + (pnlUnits != null ? ', gross P&L ' + r2(pnlUnits, 6) : '')];
+      if (t.inferred) bits.push('SL/TP inferred from the orders cancelled when the position closed — check them');
+      e.notes = bits.join(' · ');
+      return e;
+    }
+    return { parseCSV: parseCSV, toRecords: toRecords, buildTrades: buildTrades, toEntry: toEntry };
+  })();
+
+
+  // --- import UI ---
+  let importTradesList = [], importFileName = '';
+  const impEl = $('#tdd-import');
+  function impMsg(t) { $('#tdd-import-msg').textContent = t || ''; }
+  function impKeys() { return new Set(entries.map(e => e.importKey).filter(Boolean)); }
+  async function loadXlsxLib() {
+    if (window.XLSX) return window.XLSX;
+    await new Promise((res, rej) => {
+      const sc = document.createElement('script');
+      sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      sc.onload = res; sc.onerror = () => rej(new Error('Could not load the Excel reader. Save the sheet as CSV and import that instead.'));
+      document.head.appendChild(sc);
+    });
+    return window.XLSX;
+  }
+  async function readImportFile(file) {
+    if (/\.(xlsx|xls|xlsm)$/i.test(file.name)) {
+      const X = await loadXlsxLib();
+      const wb = X.read(await file.arrayBuffer(), { type: 'array' });
+      return X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
+    }
+    return TDDImport.parseCSV(await file.text());
+  }
+  function renderImportPreview() {
+    const have = impKeys();
+    const fmt = (n, d) => n == null ? '—' : (Math.round(n * Math.pow(10, d == null ? 2 : d)) / Math.pow(10, d == null ? 2 : d)).toLocaleString(undefined, { maximumFractionDigits: 8 });
+    let fresh = 0, dup = 0;
+    const rows = importTradesList.map((t, i) => {
+      const isDup = have.has(t.key); if (isDup) dup++; else fresh++;
+      const flags = (isDup ? 'already in journal' : '') + (t.open ? (isDup ? ', ' : '') + 'still open' : '') + (t.inferred ? (isDup || t.open ? ', ' : '') + 'SL/TP inferred' : '');
+      return '<tr class="' + (isDup ? 'dup' : '') + '"><td><input type="checkbox" data-imp="' + i + '"' + (isDup ? '' : ' checked') + (isDup ? ' disabled' : '') + '></td>' +
+        '<td>' + escHtml(t.date) + '</td><td>' + escHtml(t.symbol) + '</td><td>' + t.dir + '</td><td>' + fmt(t.qty, 4) + '</td><td>' + fmt(t.entry) + '</td><td>' + fmt(t.exit) + '</td>' +
+        '<td>' + fmt(t.sl) + '</td><td>' + fmt(t.tp) + '</td><td>' + (t.open ? '—' : fmt(t.gross, 4)) + '</td><td>' + fmt(t.fee, 4) + '</td><td>' + escHtml(flags) + '</td></tr>';
+    }).join('');
+    $('#tdd-import-table').innerHTML = '<table><thead><tr><th></th><th>date</th><th>symbol</th><th>side</th><th>qty</th><th>entry</th><th>exit</th><th>stop</th><th>target</th><th>gross P&amp;L</th><th>fees</th><th>notes</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    impMsg(importTradesList.length + ' trade' + (importTradesList.length === 1 ? '' : 's') + ' found in ' + importFileName + ' — ' + fresh + ' new' + (dup ? ', ' + dup + ' already in your journal (skipped)' : '') + '. Gross P&L and fees are in the file\'s own currency.');
+    $('#tdd-import-go').disabled = !fresh;
+  }
+  async function handleImportFile(file) {
+    importTradesList = []; $('#tdd-import-table').innerHTML = ''; $('#tdd-import-go').disabled = true;
+    if (!file) { impMsg(''); return; }
+    impMsg('Reading ' + file.name + '…');
+    try {
+      const matrix = await readImportFile(file);
+      const rec = TDDImport.toRecords(matrix);
+      if (rec.problem) { impMsg(rec.problem); return; }
+      importFileName = file.name;
+      importTradesList = TDDImport.buildTrades(rec.fills, rec.stops);
+      if (!importTradesList.length) { impMsg('No complete trades could be built from this file.'); return; }
+      renderImportPreview();
+    } catch (e) { impMsg('Could not read the file: ' + (e.message || e)); }
+  }
+  async function doImportTrades() {
+    if (!currentUser || !db) { openAuthModal(); return; }
+    const have = impKeys();
+    const picked = $$('#tdd-import-table input[data-imp]:checked').map(c => importTradesList[parseInt(c.dataset.imp)]).filter(t => t && !have.has(t.key));
+    if (!picked.length) { impMsg('Nothing selected.'); return; }
+    const capital = parseFloat($('#tdd-import-capital').value);
+    try { localStorage.setItem('tdd_import_capital', isNaN(capital) ? '' : String(capital)); } catch (e) {}
+    const btn = $('#tdd-import-go'); btn.disabled = true; impMsg('Saving ' + picked.length + ' trade(s)…');
+    try {
+      const ref = db.ref('positions/' + currentUser.uid), updates = {};
+      picked.forEach(t => { updates[ref.push().key] = TDDImport.toEntry(t, capital > 0 ? capital : 0, importFileName); });
+      await ref.update(updates);
+      impMsg('Imported ' + picked.length + ' trade(s). Open any of them from the journal to add the setup, checks, mistakes and Plan B.');
+      importTradesList = []; $('#tdd-import-table').innerHTML = ''; $('#tdd-import-file').value = '';
+    } catch (e) { impMsg('Could not save: ' + (e.message || e)); btn.disabled = false; }
+  }
+  $('#tdd-import-open').addEventListener('click', () => {
+    if (!currentUser) { openAuthModal(); return; }
+    impEl.style.display = 'block';
+    try { const c = localStorage.getItem('tdd_import_capital'); if (c && !$('#tdd-import-capital').value) $('#tdd-import-capital').value = c; } catch (e) {}
+  });
+  $('#tdd-import-close').addEventListener('click', () => { impEl.style.display = 'none'; });
+  $('#tdd-import-file').addEventListener('change', (ev) => handleImportFile(ev.target.files[0]));
+  $('#tdd-import-go').addEventListener('click', doImportTrades);
+  $('#tdd-filter-needs').addEventListener('change', renderJournal);
 
   function outcomeClass(o) {
     return o === 'win' ? 'o-win' : o === 'loss' ? 'o-loss' : o === 'liquidated' ? 'o-liq' : o === 'breakeven' ? 'o-win' : 'o-open';
@@ -2829,6 +3089,8 @@
   function parseNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isNaN(n) ? null : n; }
   // Fee cost of one round trip for a trade: { pct, r } or null when it can't be priced.
   function entryFee(e, points, result) {
+    const realFee = parseFloat(e.feePct); // imported trades carry their real fee (% of capital)
+    if (!isNaN(realFee)) { const rk = parseNum(e.risk) || 0; return { pct: realFee, r: rk > 0 ? realFee / rk : null }; }
     if (!(points > 0)) return { pct: 0, r: 0 };
     const risk = parseNum(e.risk) || 0;
     const entry = parseNum(e.entry), sl = parseNum(e.sl), lev = parseNum(e.leverage);
@@ -2872,7 +3134,7 @@
     box.innerHTML =
       '<div class="tdd-stat-row">' +
         stat(fmtPct(grossTotal), 'gross P&amp;L (before fees)', signClass(grossTotal)) +
-        stat('-' + feeTotal.toFixed(2) + '%', 'total fees (' + feePoints + ' pts / trade)', feeTotal > 0 ? 'tdd-pnl-neg' : '') +
+        stat('-' + feeTotal.toFixed(2) + '%', 'total fees (' + (rows.some(x => x.e.feePct != null) ? 'real fees where imported, ' : '') + feePoints + ' pts / trade otherwise)', feeTotal > 0 ? 'tdd-pnl-neg' : '') +
         stat(fmtPct(netTotal), 'net P&amp;L (after fees)', signClass(netTotal)) +
         stat(fmtPct(roi('net')), 'net ROI (compounded) · gross ' + fmtPct(roi('gross')), signClass(roi('net'))) +
       '</div>' +
@@ -3000,11 +3262,13 @@
     }
     if (!entries.length) { el.innerHTML = '<div class="tdd-empty">No trades logged yet. Log your first one from "New trade / checklist".</div>'; return; }
     try {
-    el.innerHTML = entries.map(e => (
+    const shownEntries = ($('#tdd-filter-needs') && $('#tdd-filter-needs').checked) ? entries.filter(e => e.needsDetails) : entries;
+    if (!shownEntries.length) { el.innerHTML = '<div class="tdd-empty">No imported trades are waiting for details.</div>'; return; }
+    el.innerHTML = shownEntries.map(e => (
       '<div class="tdd-entry" data-id="' + e.id + '" style="cursor:pointer;" title="Click to edit this trade">' +
         '<div class="row1"><div><span class="who">' + e.symbol + ' — ' + e.direction + '</span> <span class="when">' + e.date + '</span></div>' +
-        '<div><span class="outcome ' + outcomeClass(e.outcome) + '">' + outcomeLabel(e.outcome) + (e.bigWin ? ' · BIG WIN' : '') + '</span></div></div>' +
-        '<div class="when" style="margin-top:6px;">setup: ' + e.setup + ' · risk ' + (e.risk||'—') + '% · leverage ' + (e.leverage||'—') + 'x · SL ' + (e.sl || 'NONE SET') + ' · target ' + (e.target || 'NONE SET') + (e.rr ? ' · R:R ' + e.rr : '') + '</div>' +
+        '<div><span class="outcome ' + outcomeClass(e.outcome) + '">' + outcomeLabel(e.outcome) + (e.bigWin ? ' · BIG WIN' : '') + '</span>' + (e.needsDetails ? ' <span class="tdd-needs-badge">IMPORTED — NEEDS DETAILS</span>' : '') + '</div></div>' +
+        '<div class="when" style="margin-top:6px;">setup: ' + (e.setup || 'not set') + ' · risk ' + (e.risk||'—') + '% · leverage ' + (e.leverage||'—') + 'x · SL ' + (e.sl || (e.needsDetails ? 'not set' : 'NONE SET')) + ' · target ' + (e.target || (e.needsDetails ? 'not set' : 'NONE SET')) + (e.rr ? ' · R:R ' + e.rr : '') + '</div>' +
         '<div class="when" style="margin-top:2px;">marked: ' + ((e.marksDrawn && e.marksDrawn.length) ? e.marksDrawn.join(', ') : 'nothing marked') + (e.retest && e.retest !== 'na' ? ' · confirmation: ' + retestLabel(e.retest) : '') + '</div>' +
         (e.rangeCheck || e.chartPattern || e.reversalTrendCheck ? '<div class="when" style="margin-top:2px;">' + (e.rangeCheck ? 'range check: ' + rangeCheckLabel(e.rangeCheck) : '') + (e.rangeCheck && (e.chartPattern || e.reversalTrendCheck) ? ' · ' : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' ? 'reversal trend: ' + reversalTrendCheckLabel(e.reversalTrendCheck) : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' && e.chartPattern ? ' · ' : '') + (e.chartPattern ? 'pattern: ' + chartPatternLabel(e.chartPattern) : '') + '</div>' : '') +
         (e.candleClosed === 'no' || e.goodLevel === 'no' ? '<div class="when" style="margin-top:2px; color:var(--rust);">' + (e.candleClosed === 'no' ? 'entered before candle closed' : '') + (e.candleClosed === 'no' && e.goodLevel === 'no' ? ' · ' : '') + (e.goodLevel === 'no' ? 'weak/unproven level' : '') + '</div>' : '') +
@@ -3154,7 +3418,7 @@
     }
     const total = entries.length;
     const liq = entries.filter(e => e.outcome === 'liquidated').length;
-    const noSL = entries.filter(e => !e.sl).length;
+    const noSL = entries.filter(e => !e.sl && !e.needsDetails).length;
     const biasCount = entries.filter(e => e.bias === 'yes').length;
     statsEl.innerHTML =
       '<div class="tdd-stat"><div class="n">' + total + '</div><div class="l">trades logged</div></div>' +
@@ -3187,7 +3451,7 @@
     if (!entries.length) { liqNote.textContent = 'Log a few trades to see this.'; }
     else if (!liq) { liqNote.textContent = 'No liquidations logged yet — keep it that way.'; }
     else {
-      const liqNoSL = entries.filter(e => e.outcome === 'liquidated' && !e.sl).length;
+      const liqNoSL = entries.filter(e => e.outcome === 'liquidated' && !e.sl && !e.needsDetails).length;
       liqNote.textContent = 'Of ' + liq + ' liquidated trade(s), ' + liqNoSL + ' had no stop-loss set at entry. If that number equals ' + liq + ', the pattern is not the market — it is the missing stop-loss.';
     }
 
