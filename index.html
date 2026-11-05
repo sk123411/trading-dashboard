@@ -1078,6 +1078,7 @@
           <div class="tdd-check-grid" id="tdd-mistake-checks"></div>
         </div>
 
+        <div class="tdd-field full"><label>plan B — what will you do if this trade fails? (e.g. "stop trading until the next setup")</label><input type="text" id="f-planb" maxlength="300" placeholder="write it now, before you enter"></div>
         <div class="tdd-field full"><label>notes</label><textarea id="f-notes" placeholder="what did the structure actually look like? what were you feeling?"></textarea></div>
         <div class="tdd-field full">
           <label>reference chart screenshot (optional)</label>
@@ -1976,7 +1977,7 @@
   // Fill in your own project's config (Firebase console → Project settings → General → Your apps → SDK setup).
   // This is a public client config, not a secret — real protection comes from the Realtime Database
   // security rules (see FIREBASE_SETUP.md), which restrict each account to its own "positions/<uid>" node.
- const firebaseConfig = {
+  const firebaseConfig = {
   apiKey: "AIzaSyAb2s0CBOVR8DBhlCVPJZpQ21XMZh_fIh0",
   authDomain: "trading-dashboard-be05e.firebaseapp.com",
   databaseURL: "https://trading-dashboard-be05e-default-rtdb.firebaseio.com",
@@ -2595,6 +2596,7 @@
     if (chartPattern === 'yes-not-planned') ambers.push("You've spotted a chart pattern but haven't set target/stop from its own structure yet — a wedge, flag, or head-and-shoulders each imply their own measured-move target and invalidation point. Use it instead of guessing.");
     if (retest === 'failed') reds.push("You flagged the confirmation as failed — that's a trap, not a setup. Do not enter.");
     if (retest === 'chasing') ambers.push("Confirmation hasn't happened yet — you're entering on the shape alone. Lower probability, wider real risk than it looks.");
+    if (!$('#f-planb').value.trim()) ambers.push("No plan B written. Decide now what you'll do if this trade fails — even \"stop trading until the next setup\" counts. Without it, the next move after a loss is usually an emotional one.");
     if (!setup) ambers.push("No playbook setup selected — this is the forced-trade pattern that's cost you the most.");
     if (risk > 2) ambers.push("Risk is " + risk + "% of capital — above the 1–2% rule.");
     if (lev > 10) ambers.push("Leverage is " + lev + "x — high leverage plus full-size positions is your single biggest cause of wipeouts.");
@@ -2612,7 +2614,7 @@
       v.innerHTML = '<span class="lead">Structure, risk and stop-loss are in place</span>This still isn\'t a guarantee — it just means you\'re not defeating yourself before the trade even starts.';
     }
   }
-  ['#f-sl','#f-risk','#f-leverage','#f-setup','#f-retest','#f-target','#f-entry','#f-range-check','#f-chart-pattern','#f-reversal-trend-check'].forEach(sel => $(sel).addEventListener('input', () => { computeRR(); computeVerdict(); }));
+  ['#f-planb','#f-sl','#f-risk','#f-leverage','#f-setup','#f-retest','#f-target','#f-entry','#f-range-check','#f-chart-pattern','#f-reversal-trend-check'].forEach(sel => $(sel).addEventListener('input', () => { computeRR(); computeVerdict(); }));
   $$('input[name="f-bias"]').forEach(r => r.addEventListener('change', computeVerdict));
   ['#f-mark-support','#f-mark-resistance','#f-mark-trendline'].forEach(sel => $(sel).addEventListener('change', computeVerdict));
   $$('input[name="f-daily"]').forEach(r => r.addEventListener('change', computeVerdict));
@@ -2652,6 +2654,7 @@
       goodLevel: $('input[name="f-goodlevel"]:checked').value,
       bias: $('input[name="f-bias"]:checked').value,
       mistakes: checkedMistakes,
+      planB: $('#f-planb').value.trim(),
       notes: $('#f-notes').value,
       createdAt: Date.now()
     };
@@ -2668,7 +2671,7 @@
   function resetForm() {
     editingId = null;
     $('#f-date').value = new Date().toISOString().slice(0,10);
-    $('#f-symbol').value=''; $('#f-entry').value=''; $('#f-sl').value=''; $('#f-target').value=''; $('#f-rr').value=''; $('#f-notes').value='';
+    $('#f-symbol').value=''; $('#f-entry').value=''; $('#f-sl').value=''; $('#f-target').value=''; $('#f-rr').value=''; $('#f-notes').value=''; $('#f-planb').value='';
     $('#f-direction').value = 'Long';
     $('#f-htf').value = 'up';
     $('#f-leverage').value = '1';
@@ -2725,6 +2728,7 @@
     const mistakesSet = new Set(e.mistakes || []);
     $$('#tdd-mistake-checks input').forEach(c => { c.checked = mistakesSet.has(MISTAKES[parseInt(c.value)]); });
     $('#f-notes').value = e.notes || '';
+    $('#f-planb').value = e.planB || '';
     if (e.referenceImage) {
       refImageDataUrl = e.referenceImage;
       $('#f-refimage-thumb').src = e.referenceImage;
@@ -3005,6 +3009,7 @@
         (e.rangeCheck || e.chartPattern || e.reversalTrendCheck ? '<div class="when" style="margin-top:2px;">' + (e.rangeCheck ? 'range check: ' + rangeCheckLabel(e.rangeCheck) : '') + (e.rangeCheck && (e.chartPattern || e.reversalTrendCheck) ? ' · ' : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' ? 'reversal trend: ' + reversalTrendCheckLabel(e.reversalTrendCheck) : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' && e.chartPattern ? ' · ' : '') + (e.chartPattern ? 'pattern: ' + chartPatternLabel(e.chartPattern) : '') + '</div>' : '') +
         (e.candleClosed === 'no' || e.goodLevel === 'no' ? '<div class="when" style="margin-top:2px; color:var(--rust);">' + (e.candleClosed === 'no' ? 'entered before candle closed' : '') + (e.candleClosed === 'no' && e.goodLevel === 'no' ? ' · ' : '') + (e.goodLevel === 'no' ? 'weak/unproven level' : '') + '</div>' : '') +
         (e.mistakes.length ? '<div class="tdd-pill-row">' + e.mistakes.map(m => '<span class="tdd-pill">' + m + '</span>').join('') + '</div>' : '') +
+        (e.planB ? '<div class="note"><b>Plan B:</b> ' + escHtml(e.planB) + '</div>' : '') +
         (e.notes ? '<div class="note">' + e.notes + '</div>' : '') +
         (e.referenceImage ? '<div class="tdd-entry-ref"><img class="tdd-ref-zoom" src="' + e.referenceImage + '" alt="reference chart"></div>' : '') +
         '<button class="tdd-btn ghost small del" data-del="' + e.id + '">Delete</button>' +
