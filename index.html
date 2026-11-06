@@ -297,6 +297,20 @@
 .tdd-friend-day::before, .tdd-friend-day::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 .tdd-friend-note { text-align: center; color: var(--text-faint); font-size: 12px; font-style: italic; padding: 18px 10px; }
 .tdd-friend.tdd-friend-adminonly .tdd-friend-toggles,
+.tdd-bias { position: sticky; top: 0; z-index: 20; margin: -26px -34px 18px -34px; padding: 10px 34px; background: var(--bg-panel); border-bottom: 1px solid var(--border); }
+.tdd-bias-head { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--text-faint); margin-bottom: 6px; }
+.tdd-bias-sym { font-family: 'IBM Plex Mono', monospace; color: var(--text-dim); font-weight: 600; }
+.tdd-bias-head .tdd-btn { margin-left: auto; padding: 1px 8px; }
+.tdd-bias-cells { display: flex; gap: 10px; flex-wrap: wrap; }
+.tdd-bias-cell { flex: 1 1 340px; border: 1px solid var(--border); border-left: 3px solid var(--text-faint); border-radius: 4px; padding: 7px 10px; font-size: 12px; color: var(--text-dim); line-height: 1.5; background: var(--bg); }
+.tdd-bias-cell.bearish { border-left-color: var(--candle-red); }
+.tdd-bias-cell.bullish { border-left-color: var(--candle-green); }
+.tdd-bias-cell.shifting { border-left-color: var(--amber); }
+.tdd-bias-cell b { color: var(--text); }
+.tdd-bias-cell .n { color: var(--amber); font-size: 11.5px; margin-top: 2px; }
+.tdd-trend-pill { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; letter-spacing: 0.04em; border: 1px solid var(--text-faint); color: var(--text-dim); }
+.tdd-trend-pill.with { color: var(--candle-green); border-color: var(--candle-green); }
+.tdd-trend-pill.counter { color: var(--candle-red); border-color: var(--candle-red); }
 .tdd-import { background: var(--bg-panel); border: 1px solid var(--border); border-left: 3px solid var(--teal); border-radius: 4px; padding: 14px 16px; margin-bottom: 14px; }
 .tdd-import table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 10px; }
 .tdd-import th, .tdd-import td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -494,6 +508,10 @@
   </div>
 
   <div class="tdd-main">
+    <div class="tdd-bias" id="tdd-bias" style="display:none;">
+      <div class="tdd-bias-head"><span class="tdd-bias-sym" id="tdd-bias-sym"></span><span id="tdd-bias-asof"></span><button class="tdd-btn ghost small" id="tdd-bias-refresh" type="button" title="Re-read weekly and daily structure now">↻ refresh</button></div>
+      <div class="tdd-bias-cells" id="tdd-bias-cells"></div>
+    </div>
 
     <!-- HOME -->
     <div class="tdd-panel active" id="panel-home">
@@ -874,7 +892,7 @@
           <label><input type="checkbox" id="tdd-friend-opt-structure" checked> Market structure</label>
           <label><input type="checkbox" id="tdd-friend-opt-smc" checked> SMC concepts</label>
           <label><input type="checkbox" id="tdd-friend-opt-volatility" checked> Volatility &amp; volume</label>
-          <label title="Off = previous behaviour. On = every market reply opens with the weekly + daily bias, invalidation level, premium/discount and nearest FVG."><input type="checkbox" id="tdd-friend-opt-bigpicture"> Bigger-picture rule</label>
+          <label title="Off = previous behaviour. On = every market reply opens with the weekly + daily bias, invalidation level, premium/discount and nearest FVG."><input type="checkbox" id="tdd-friend-opt-bigpicture" checked> Bigger-picture rule</label>
           <label title="Off = previous behaviour. On = each market reply ends with a checklist of how many of your conditions line up (bias, sweep, structure shift, location, FVG, RSI divergence, reversal candle, volume, room to target). A checklist only — not a probability or a risk size."><input type="checkbox" id="tdd-friend-opt-confluence"> Confluence check</label>
           <label title="Off = previous behaviour. On = adds an optional 15-minute timeframe for entry timing (crypto and NSE). Higher timeframes still decide the bias."><input type="checkbox" id="tdd-friend-opt-m15"> 15m candles</label>
           <label title="Off = previous behaviour. On = adds order blocks and equal highs/lows (liquidity pools) on the daily and 4H as extra key levels."><input type="checkbox" id="tdd-friend-opt-extrasmc"> Extra SMC</label>
@@ -1085,6 +1103,8 @@
           <div class="tdd-check-grid" id="tdd-mistake-checks"></div>
         </div>
 
+        <div class="tdd-field"><label>bias invalidation — the price that proves your higher-timeframe read wrong</label><input type="number" id="f-invalid" step="any" placeholder="type it before you enter"></div>
+        <div class="tdd-field"><label>trend relation (for your stats)</label><select id="f-trendtag"><option value="auto">auto — from the bias banner</option><option value="with-trend">with-trend</option><option value="counter-trend">counter-trend</option><option value="unknown">unknown</option></select></div>
         <div class="tdd-field full"><label>plan B — what will you do if this trade fails? (e.g. "stop trading until the next setup")</label><input type="text" id="f-planb" maxlength="300" placeholder="write it now, before you enter"></div>
         <div class="tdd-field full"><label>notes</label><textarea id="f-notes" placeholder="what did the structure actually look like? what were you feeling?"></textarea></div>
         <div class="tdd-field full">
@@ -1369,6 +1389,7 @@
     $('#tv-iframe').src = buildTVUrl(symbol);
     const friendSym = $('#tdd-friend-symbol');
     if (friendSym) friendSym.textContent = symbol.split(':').pop();
+    if (typeof refreshBiasBanner === 'function' && currentUser) refreshBiasBanner(false);
   }
 
   function ensureChartLoaded() {
@@ -1882,6 +1903,107 @@
     if (cfg) el.innerHTML = patternSvg(cfg);
   });
 
+  // --- bias banner / counter-trend check (weekly + daily structure from the Worker, closed candles only) ---
+  let biasCache = {}, biasInflight = {}, biasBannerSymbol = null;
+  function biasKey(sym) {
+    const u = String(sym || '').trim().toUpperCase();
+    if (!u) return '';
+    return /^(NSE|BSE):/.test(u) ? u : u.split(':').pop().replace(/[^A-Z0-9]/g, '');
+  }
+  function fmtSince(d) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || ''); if (!m) return d || '';
+    const dt = new Date(+m[1], +m[2] - 1, +m[3]);
+    return dt.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: dt.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+  }
+  async function fetchBias(symbolRaw, force) {
+    const key = biasKey(symbolRaw);
+    if (!key || !currentUser) return null;
+    const c = biasCache[key];
+    if (!force && c && c.data && Date.now() - c.at < 5 * 60000) return c.data;
+    if (biasInflight[key]) return biasInflight[key];
+    biasInflight[key] = (async () => {
+      try {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch(TRADING_FRIEND_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: idToken, symbol: symbolRaw, biasOnly: true }) });
+        let data = {}; try { data = await res.json(); } catch (e) {}
+        if (res.ok && data.bias) { biasCache[key] = { data: data.bias, at: Date.now() }; return data.bias; }
+        biasCache[key] = { data: null, at: Date.now(), err: data.error || ('HTTP ' + res.status) };
+        return null;
+      } catch (e) { biasCache[key] = { data: null, at: Date.now(), err: String(e.message || e) }; return null; }
+      finally { delete biasInflight[key]; }
+    })();
+    return biasInflight[key];
+  }
+  function biasCellHtml(t) {
+    if (!t) return '';
+    const shifting = /^shifting/.test(t.status);
+    const cls = shifting ? 'shifting' : (t.trend === 'bearish' ? 'bearish' : t.trend === 'bullish' ? 'bullish' : '');
+    const label = shifting ? (t.trend.toUpperCase() + ' — shift ' + (t.status === 'shifting-up' ? 'UP' : 'DOWN') + ' in progress') : t.trend.toUpperCase();
+    const inv = t.invalidation != null ? ' · invalid only on a CLOSE ' + (t.trend === 'bearish' ? 'above ' : 'below ') + fmtNum(t.invalidation)
+      : (t.swingHigh != null && t.swingLow != null ? ' · range ' + fmtNum(t.swingLow) + '–' + fmtNum(t.swingHigh) : '');
+    return '<div class="tdd-bias-cell ' + cls + '"><b>' + escHtml(t.label) + ': ' + escHtml(label) + '</b>' + (t.since ? ' since ' + escHtml(fmtSince(t.since)) : '') + escHtml(inv) +
+      (t.zone ? ' · price in ' + escHtml(t.zone) + (t.zonePos != null && /^(premium|discount)$/.test(t.zone) ? ' (' + t.zonePos + '% of range)' : '') : '') +
+      (t.testing ? '<div class="n">Price is trading through that level right now — the bias only breaks if the candle CLOSES beyond it.</div>' : '') +
+      (t.note ? '<div class="n">' + escHtml(t.note) + '</div>' : '') + '</div>';
+  }
+  function renderBiasBanner(bias, errText) {
+    const box = $('#tdd-bias');
+    if (!box) return;
+    if (!currentUser || !isFriendAdmin()) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    $('#tdd-bias-sym').textContent = String(tvSymbol).split(':').pop();
+    if (!bias) { $('#tdd-bias-asof').textContent = ''; $('#tdd-bias-cells').innerHTML = '<div class="tdd-bias-cell">' + escHtml(errText || 'Reading weekly and daily structure…') + '</div>'; return; }
+    $('#tdd-bias-asof').textContent = 'updated ' + new Date(bias.asOf || Date.now()).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) + ' · structure read on closed candles only';
+    $('#tdd-bias-cells').innerHTML = biasCellHtml(bias.weekly) + biasCellHtml(bias.daily);
+  }
+  // Remembers the last bias per symbol (bias/<uid>/<symbol>/current) and logs every change in bias/<uid>/<symbol>/history.
+  async function persistBias(symbolRaw, bias) {
+    if (!currentUser || !db || !bias) return;
+    const key = biasKey(symbolRaw).replace(/[.#$\[\]\/:]/g, '_'); if (!key) return;
+    const pick = t => t ? { status: t.status, since: t.since || null, invalidation: t.invalidation == null ? null : t.invalidation } : null;
+    const cur = { weekly: pick(bias.weekly), daily: pick(bias.daily), price: (bias.daily || bias.weekly || {}).price || null, checkedAt: Date.now() };
+    try {
+      const base = db.ref('bias/' + currentUser.uid + '/' + key);
+      const prev = (await base.child('current').once('value')).val();
+      const st = o => (o && o.status) || '';
+      if (prev && (st(prev.weekly) !== st(cur.weekly) || st(prev.daily) !== st(cur.daily))) {
+        await base.child('history').push({ ts: Date.now(), from: { weekly: st(prev.weekly), daily: st(prev.daily) }, to: { weekly: st(cur.weekly), daily: st(cur.daily) }, price: cur.price });
+      }
+      await base.child('current').set(cur);
+    } catch (e) { /* rules for "bias" may not exist yet — the banner still works */ }
+  }
+  async function refreshBiasBanner(force) {
+    if (!currentUser || !isFriendAdmin()) { renderBiasBanner(null); return; }
+    const sym = tvSymbol; biasBannerSymbol = biasKey(sym);
+    if (!$('#tdd-bias-cells').innerHTML) renderBiasBanner(null);
+    const b = await fetchBias(sym, !!force);
+    if (biasKey(tvSymbol) !== biasBannerSymbol) return; // symbol changed while loading
+    if (b) { renderBiasBanner(b); persistBias(sym, b); }
+    else { const c = biasCache[biasKey(sym)]; renderBiasBanner(null, 'Could not read the bias for ' + String(sym).split(':').pop() + (c && c.err ? ' — ' + c.err : '') + ' (deploy the latest Worker if you have not).'); }
+  }
+  function computeTrendTag(dir, b) {
+    if (!b) return 'unknown';
+    const want = dir === 'Long' ? 'bullish' : 'bearish', opp = dir === 'Long' ? 'bearish' : 'bullish';
+    const d = b.daily && b.daily.trend, w = b.weekly && b.weekly.trend;
+    if (d === opp || w === opp) return 'counter-trend';
+    if (d === want) return 'with-trend';
+    return 'unknown';
+  }
+  function updateInvalidPlaceholder() {
+    const cb = biasCache[biasKey($('#f-symbol').value)], b = cb && cb.data, el = $('#f-invalid');
+    if (!el) return;
+    if (b && b.daily) {
+      const lng = $('#f-direction').value === 'Long', v = lng ? b.daily.swingLow : b.daily.swingHigh;
+      el.placeholder = v != null ? 'e.g. ' + v + ' (last daily swing ' + (lng ? 'low' : 'high') + ')' : 'type it before you enter';
+    } else el.placeholder = 'type it before you enter';
+  }
+  async function ensureFormBias() {
+    const sym = $('#f-symbol').value.trim();
+    if (sym && currentUser && isFriendAdmin()) await fetchBias(sym, false);
+    updateInvalidPlaceholder(); computeVerdict();
+  }
+  setInterval(() => { if (!document.hidden && currentUser && isFriendAdmin()) refreshBiasBanner(false); }, 15 * 60000);
+
   // --- setup select --- (rebuilt whenever the playbook changes: built-ins as edited + your own strategies)
   function rebuildSetupSelect() {
     const sel = document.getElementById('f-setup');
@@ -2003,7 +2125,7 @@
   // Fill in your own project's config (Firebase console → Project settings → General → Your apps → SDK setup).
   // This is a public client config, not a secret — real protection comes from the Realtime Database
   // security rules (see FIREBASE_SETUP.md), which restrict each account to its own "positions/<uid>" node.
- const firebaseConfig = {
+const firebaseConfig = {
   apiKey: "AIzaSyAb2s0CBOVR8DBhlCVPJZpQ21XMZh_fIh0",
   authDomain: "trading-dashboard-be05e.firebaseapp.com",
   databaseURL: "https://trading-dashboard-be05e-default-rtdb.firebaseio.com",
@@ -2078,7 +2200,7 @@
         closeAuthModal();
         if (pendingSaveAfterAuth) { pendingSaveAfterAuth = false; doSaveEntry(); }
         if (pendingPlaybookSyncAfterAuth) { pendingPlaybookSyncAfterAuth = false; doSyncPlaybook(); }
-        if (isFriendAdmin()) { loadFriendHistory(); loadSuggestedTrades(); }
+        if (isFriendAdmin()) { loadFriendHistory(); loadSuggestedTrades(); refreshBiasBanner(true); }
         loadPlan();
         loadFeeSetting();
         loadCustomStrategies();
@@ -2093,6 +2215,7 @@
         friendHistory = [];
         $('#tdd-friend-count').textContent = '';
         suggestedTrades = []; tradesLoadSeq++; renderSuggestedTrades();
+        biasCache = {}; renderBiasBanner(null);
       }
     });
   } else {
@@ -2398,6 +2521,7 @@
       const repliedAt = Date.now();
       appendFriendMsg('assistant', reply, modelTag, repliedAt);
       friendHistory.push({ role: 'assistant', content: reply });
+      if (data.bias) { biasCache[biasKey(tvSymbol)] = { data: data.bias, at: Date.now() }; renderBiasBanner(data.bias); persistBias(tvSymbol, data.bias); computeVerdict(); }
       saveFriendExchange(text, sentAt, reply, repliedAt, data).then(() => { if (data.trade) loadSuggestedTrades(); });
     } catch (e) {
       removeFriendTyping();
@@ -2428,6 +2552,16 @@
     sendFriendMessage("What's your take on the current market structure on " + tvSymbol.split(':').pop() + "? Give me your best trade if there is one.");
   });
 
+
+  // remember the analysis tick-boxes between visits (Bigger-picture rule starts ticked)
+  const FRIEND_OPT_KEYS = ['structure', 'smc', 'volatility', 'bigpicture', 'confluence', 'm15', 'extrasmc', 'trademap', 'weaksr', 'fib'];
+  try {
+    const savedOpts = JSON.parse(localStorage.getItem('tdd_friend_opts') || 'null');
+    if (savedOpts) FRIEND_OPT_KEYS.forEach(k => { const el = $('#tdd-friend-opt-' + k); if (el && typeof savedOpts[k] === 'boolean') el.checked = savedOpts[k]; });
+  } catch (e) {}
+  FRIEND_OPT_KEYS.forEach(k => { const el = $('#tdd-friend-opt-' + k); if (el) el.addEventListener('change', () => {
+    try { const o = {}; FRIEND_OPT_KEYS.forEach(j => { o[j] = $('#tdd-friend-opt-' + j).checked; }); localStorage.setItem('tdd_friend_opts', JSON.stringify(o)); } catch (e) {}
+  }); });
 
   // --- "Copy for Claude": same request as Send, but the Worker returns the prompt instead of calling an AI ---
   function friendAnalysisOpts() {
@@ -2467,6 +2601,7 @@
   $('#tdd-friend-copy').addEventListener('click', copyForClaude);
   $('#tdd-copybox-copy').addEventListener('click', async () => { const ok = await copyTextToClipboard($('#tdd-copybox-text').value); $('#tdd-copybox-msg').textContent = ok ? 'Copied again.' : 'Could not copy automatically — select the text and copy it.'; });
   $('#tdd-copybox-open').addEventListener('click', () => { window.open('https://claude.ai/new', '_blank', 'noopener'); });
+  $('#tdd-bias-refresh').addEventListener('click', () => refreshBiasBanner(true));
   $('#tdd-copybox-close').addEventListener('click', () => { $('#tdd-copybox').style.display = 'none'; });
 
   // history date filter: defaults to the last 5 days
@@ -2623,6 +2758,14 @@
     if (retest === 'failed') reds.push("You flagged the confirmation as failed — that's a trap, not a setup. Do not enter.");
     if (retest === 'chasing') ambers.push("Confirmation hasn't happened yet — you're entering on the shape alone. Lower probability, wider real risk than it looks.");
     if (!$('#f-planb').value.trim()) ambers.push("No plan B written. Decide now what you'll do if this trade fails — even \"stop trading until the next setup\" counts. Without it, the next move after a loss is usually an emotional one.");
+    {
+      const symTyped = $('#f-symbol').value.trim(), cb = symTyped ? biasCache[biasKey(symTyped)] : null, bb = cb && cb.data;
+      const dirV = $('#f-direction').value, oppV = dirV === 'Long' ? 'bearish' : 'bullish';
+      if (bb) [bb.weekly, bb.daily].forEach(t => {
+        if (t && t.trend === oppV) reds.push("Counter-trend: you're going " + dirV + " into a " + t.trend.toUpperCase() + " " + t.label.toLowerCase() + " structure" + (t.since ? " (since " + fmtSince(t.since) + ")" : "") + (t.invalidation != null ? ", which only breaks on a close " + (t.trend === 'bearish' ? 'above ' : 'below ') + fmtNum(t.invalidation) : "") + ". A bounce inside it is a pullback, not a reversal — wait for that close, or accept this is a counter-trend trade.");
+      });
+      if (!$('#f-invalid').value.trim()) ambers.push("No bias-invalidation level. Type the price at which your read of the higher timeframe is wrong — if you can't name it, you're trading on a feeling.");
+    }
     if (!setup) ambers.push("No playbook setup selected — this is the forced-trade pattern that's cost you the most.");
     if (risk > 2) ambers.push("Risk is " + risk + "% of capital — above the 1–2% rule.");
     if (lev > 10) ambers.push("Leverage is " + lev + "x — high leverage plus full-size positions is your single biggest cause of wipeouts.");
@@ -2640,7 +2783,9 @@
       v.innerHTML = '<span class="lead">Structure, risk and stop-loss are in place</span>This still isn\'t a guarantee — it just means you\'re not defeating yourself before the trade even starts.';
     }
   }
-  ['#f-planb','#f-sl','#f-risk','#f-leverage','#f-setup','#f-retest','#f-target','#f-entry','#f-range-check','#f-chart-pattern','#f-reversal-trend-check'].forEach(sel => $(sel).addEventListener('input', () => { computeRR(); computeVerdict(); }));
+  ['#f-invalid','#f-planb','#f-sl','#f-risk','#f-leverage','#f-setup','#f-retest','#f-target','#f-entry','#f-range-check','#f-chart-pattern','#f-reversal-trend-check'].forEach(sel => $(sel).addEventListener('input', () => { computeRR(); computeVerdict(); }));
+  $('#f-symbol').addEventListener('change', ensureFormBias);
+  $('#f-direction').addEventListener('change', () => { updateInvalidPlaceholder(); computeVerdict(); });
   $$('input[name="f-bias"]').forEach(r => r.addEventListener('change', computeVerdict));
   ['#f-mark-support','#f-mark-resistance','#f-mark-trendline'].forEach(sel => $(sel).addEventListener('change', computeVerdict));
   $$('input[name="f-daily"]').forEach(r => r.addEventListener('change', computeVerdict));
@@ -2681,9 +2826,17 @@
       bias: $('input[name="f-bias"]:checked').value,
       mistakes: checkedMistakes,
       planB: $('#f-planb').value.trim(),
+      biasInvalidation: $('#f-invalid').value.trim(),
       notes: $('#f-notes').value,
       createdAt: Date.now()
     };
+    {
+      const cb = biasCache[biasKey($('#f-symbol').value)], bb = cb && cb.data, sel = $('#f-trendtag').value;
+      if (sel !== 'auto') entry.trendTag = sel;
+      else if (editingId) entry.trendTag = ((entries.find(x => x.id === editingId) || {}).trendTag) || 'unknown';
+      else entry.trendTag = computeTrendTag($('#f-direction').value, bb);
+      if (!editingId && bb) { entry.biasDaily = bb.daily ? bb.daily.status : ''; entry.biasWeekly = bb.weekly ? bb.weekly.status : ''; }
+    }
     entry.referenceImage = refImageDataUrl || null; // explicit null so editing can clear a previously-saved image
     return entry;
   }
@@ -2698,7 +2851,7 @@
     editingId = null;
     $('#tdd-import-edit-note').style.display = 'none';
     $('#f-date').value = new Date().toISOString().slice(0,10);
-    $('#f-symbol').value=''; $('#f-entry').value=''; $('#f-sl').value=''; $('#f-target').value=''; $('#f-rr').value=''; $('#f-notes').value=''; $('#f-planb').value='';
+    $('#f-symbol').value=''; $('#f-entry').value=''; $('#f-sl').value=''; $('#f-target').value=''; $('#f-rr').value=''; $('#f-notes').value=''; $('#f-planb').value=''; $('#f-invalid').value=''; $('#f-trendtag').value='auto';
     $('#f-direction').value = 'Long';
     $('#f-htf').value = 'up';
     $('#f-leverage').value = '1';
@@ -2756,6 +2909,8 @@
     $$('#tdd-mistake-checks input').forEach(c => { c.checked = mistakesSet.has(MISTAKES[parseInt(c.value)]); });
     $('#f-notes').value = e.notes || '';
     $('#f-planb').value = e.planB || '';
+    $('#f-invalid').value = e.biasInvalidation || '';
+    $('#f-trendtag').value = e.trendTag || 'unknown';
     if (e.referenceImage) {
       refImageDataUrl = e.referenceImage;
       $('#f-refimage-thumb').src = e.referenceImage;
@@ -3229,6 +3384,12 @@
     const label = t => t.e.symbol + ' ' + t.e.direction + ' (' + t.e.date + ')';
     const estCount = priced.filter(t => t.estimated).length;
 
+    const trendParts = ['with-trend', 'counter-trend'].map(tg => {
+      const xs = priced.filter(t => t.e.trendTag === tg); if (!xs.length) return null;
+      const w = xs.filter(t => t.cls === 'win').length, l = xs.filter(t => t.cls === 'loss').length;
+      return tg + ': ' + xs.length + ' trade' + (xs.length === 1 ? '' : 's') + ', win rate ' + (w + l ? Math.round(w / (w + l) * 100) + '%' : '—') + ', net ' + fmtPct(xs.reduce((a, t) => a + t.pct, 0));
+    }).filter(Boolean);
+    const trendStatsHtml = trendParts.length ? '<p class="tdd-pnl-note"><b>By trend relation (higher-timeframe bias at entry):</b> ' + trendParts.join(' · ') + '</p>' : '';
     const stat = (n, l, cls) => '<div class="tdd-stat"><div class="n ' + (cls || '') + '">' + n + '</div><div class="l">' + l + '</div></div>';
     box.innerHTML =
       '<div class="tdd-pnl-title">Performance — all closed trades</div>' +
@@ -3247,7 +3408,7 @@
       '<p class="tdd-pnl-note">Best: ' + label(best) + ' ' + fmtPct(best.pct) + ' · Worst: ' + label(worst) + ' ' + fmtPct(worst.pct) +
         ' · ' + open + ' open (not counted)' + (unpriced ? ' · ' + unpriced + ' win(s) skipped — no target/R:R or actual result' : '') + '</p>' +
       '<p class="tdd-pnl-note">' + estCount + ' of ' + priced.length + ' trade' + (priced.length === 1 ? ' is' : 's are') + ' estimated from your R:R and risk % (a win is assumed to hit its target, a loss to stop out at exactly -1R). ' +
-        'Enter an actual result on a trade to replace its estimate — especially liquidations, which can lose more than the risk % you set.</p>';
+        'Enter an actual result on a trade to replace its estimate — especially liquidations, which can lose more than the risk % you set.</p>' + trendStatsHtml;
   }
 
   function renderJournal() {
@@ -3267,7 +3428,7 @@
     el.innerHTML = shownEntries.map(e => (
       '<div class="tdd-entry" data-id="' + e.id + '" style="cursor:pointer;" title="Click to edit this trade">' +
         '<div class="row1"><div><span class="who">' + e.symbol + ' — ' + e.direction + '</span> <span class="when">' + e.date + '</span></div>' +
-        '<div><span class="outcome ' + outcomeClass(e.outcome) + '">' + outcomeLabel(e.outcome) + (e.bigWin ? ' · BIG WIN' : '') + '</span>' + (e.needsDetails ? ' <span class="tdd-needs-badge">IMPORTED — NEEDS DETAILS</span>' : '') + '</div></div>' +
+        '<div><span class="outcome ' + outcomeClass(e.outcome) + '">' + outcomeLabel(e.outcome) + (e.bigWin ? ' · BIG WIN' : '') + '</span>' + (e.trendTag === 'with-trend' ? ' <span class="tdd-trend-pill with">WITH-TREND</span>' : e.trendTag === 'counter-trend' ? ' <span class="tdd-trend-pill counter">COUNTER-TREND</span>' : '') + (e.needsDetails ? ' <span class="tdd-needs-badge">IMPORTED — NEEDS DETAILS</span>' : '') + '</div></div>' +
         '<div class="when" style="margin-top:6px;">setup: ' + (e.setup || 'not set') + ' · risk ' + (e.risk||'—') + '% · leverage ' + (e.leverage||'—') + 'x · SL ' + (e.sl || (e.needsDetails ? 'not set' : 'NONE SET')) + ' · target ' + (e.target || (e.needsDetails ? 'not set' : 'NONE SET')) + (e.rr ? ' · R:R ' + e.rr : '') + '</div>' +
         '<div class="when" style="margin-top:2px;">marked: ' + ((e.marksDrawn && e.marksDrawn.length) ? e.marksDrawn.join(', ') : 'nothing marked') + (e.retest && e.retest !== 'na' ? ' · confirmation: ' + retestLabel(e.retest) : '') + '</div>' +
         (e.rangeCheck || e.chartPattern || e.reversalTrendCheck ? '<div class="when" style="margin-top:2px;">' + (e.rangeCheck ? 'range check: ' + rangeCheckLabel(e.rangeCheck) : '') + (e.rangeCheck && (e.chartPattern || e.reversalTrendCheck) ? ' · ' : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' ? 'reversal trend: ' + reversalTrendCheckLabel(e.reversalTrendCheck) : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' && e.chartPattern ? ' · ' : '') + (e.chartPattern ? 'pattern: ' + chartPatternLabel(e.chartPattern) : '') + '</div>' : '') +
