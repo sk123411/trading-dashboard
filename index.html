@@ -297,6 +297,47 @@
 .tdd-friend-day::before, .tdd-friend-day::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 .tdd-friend-note { text-align: center; color: var(--text-faint); font-size: 12px; font-style: italic; padding: 18px 10px; }
 .tdd-friend.tdd-friend-adminonly .tdd-friend-toggles,
+.tdd-bias { position: sticky; top: 0; z-index: 20; margin: -26px -34px 18px -34px; padding: 10px 34px; background: var(--bg-panel); border-bottom: 1px solid var(--border); }
+.tdd-bias-head { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--text-faint); margin-bottom: 6px; }
+.tdd-bias-sym { font-family: 'IBM Plex Mono', monospace; color: var(--text-dim); font-weight: 600; }
+.tdd-bias-head .tdd-btn { margin-left: auto; padding: 1px 8px; }
+.tdd-bias-cells { display: flex; gap: 10px; flex-wrap: wrap; }
+.tdd-bias-cell { flex: 1 1 340px; border: 1px solid var(--border); border-left: 3px solid var(--text-faint); border-radius: 4px; padding: 7px 10px; font-size: 12px; color: var(--text-dim); line-height: 1.5; background: var(--bg); }
+.tdd-bias-cell.bearish { border-left-color: var(--candle-red); }
+.tdd-bias-cell.bullish { border-left-color: var(--candle-green); }
+.tdd-bias-cell.shifting { border-left-color: var(--amber); }
+.tdd-bias-cell b { color: var(--text); }
+.tdd-bias-cell .n { color: var(--amber); font-size: 11.5px; margin-top: 2px; }
+.tdd-trend-pill { font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; letter-spacing: 0.04em; border: 1px solid var(--text-faint); color: var(--text-dim); }
+.tdd-trend-pill.with { color: var(--candle-green); border-color: var(--candle-green); }
+.tdd-trend-pill.counter { color: var(--candle-red); border-color: var(--candle-red); }
+.tdd-import { background: var(--bg-panel); border: 1px solid var(--border); border-left: 3px solid var(--teal); border-radius: 4px; padding: 14px 16px; margin-bottom: 14px; }
+.tdd-import table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 10px; }
+.tdd-import th, .tdd-import td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.tdd-import th { color: var(--text-faint); font-weight: 500; text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; }
+.tdd-import tr.dup td { opacity: 0.45; }
+.tdd-import .tdd-imp-scroll { overflow-x: auto; }
+.tdd-needs-badge { color: var(--amber); font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; }
+.tdd-copybox { border-top: 1px solid var(--border); padding: 10px 15px; }
+.tdd-copybox textarea { width: 100%; box-sizing: border-box; margin-top: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 8px; }
+.tdd-friend.tdd-friend-adminonly .tdd-copybox { display: none !important; }
+.tdd-trades { border-top: 1px solid var(--border); padding: 12px 15px; }
+.tdd-trades-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.tdd-trades-title { font-weight: 600; font-size: 13px; color: var(--amber); }
+.tdd-trades-sub { color: var(--text-faint); font-size: 11px; }
+.tdd-trades-head .tdd-btn { margin-left: auto; }
+.tdd-trade { border: 1px solid var(--border); border-radius: 4px; background: var(--bg); margin-bottom: 6px; cursor: pointer; }
+.tdd-trade-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; font-size: 12px; }
+.tdd-trade-dir { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 3px; letter-spacing: 0.04em; }
+.tdd-trade-dir.long { color: var(--candle-green); border: 1px solid var(--candle-green); }
+.tdd-trade-dir.short { color: var(--candle-red); border: 1px solid var(--candle-red); }
+.tdd-trade-sym { font-weight: 600; }
+.tdd-trade-time { color: var(--text-faint); font-size: 11px; }
+.tdd-trade-nums { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--text-dim); }
+.tdd-trade-detail { display: none; padding: 8px 10px 10px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+.tdd-trade.open .tdd-trade-detail { display: block; }
+.tdd-trades-empty { color: var(--text-faint); font-size: 12px; font-style: italic; }
+.tdd-friend.tdd-friend-adminonly .tdd-trades,
 .tdd-friend.tdd-friend-adminonly .tdd-friend-history-bar,
 .tdd-friend.tdd-friend-adminonly .tdd-friend-input-row,
 .tdd-friend.tdd-friend-adminonly #tdd-friend-quick { display: none; }
@@ -467,6 +508,10 @@
   </div>
 
   <div class="tdd-main">
+    <div class="tdd-bias" id="tdd-bias" style="display:none;">
+      <div class="tdd-bias-head"><span class="tdd-bias-sym" id="tdd-bias-sym"></span><span id="tdd-bias-asof"></span><button class="tdd-btn ghost small" id="tdd-bias-refresh" type="button" title="Re-read weekly and daily structure now">↻ refresh</button></div>
+      <div class="tdd-bias-cells" id="tdd-bias-cells"></div>
+    </div>
 
     <!-- HOME -->
     <div class="tdd-panel active" id="panel-home">
@@ -847,7 +892,13 @@
           <label><input type="checkbox" id="tdd-friend-opt-structure" checked> Market structure</label>
           <label><input type="checkbox" id="tdd-friend-opt-smc" checked> SMC concepts</label>
           <label><input type="checkbox" id="tdd-friend-opt-volatility" checked> Volatility &amp; volume</label>
-          <label title="Off = previous behaviour. On = every market reply opens with the weekly + daily bias, invalidation level, premium/discount and nearest FVG."><input type="checkbox" id="tdd-friend-opt-bigpicture"> Bigger-picture rule</label>
+          <label title="Off = previous behaviour. On = every market reply opens with the weekly + daily bias, invalidation level, premium/discount and nearest FVG."><input type="checkbox" id="tdd-friend-opt-bigpicture" checked> Bigger-picture rule</label>
+          <label title="Off = previous behaviour. On = each market reply ends with a checklist of how many of your conditions line up (bias, sweep, structure shift, location, FVG, RSI divergence, reversal candle, volume, room to target). A checklist only — not a probability or a risk size."><input type="checkbox" id="tdd-friend-opt-confluence"> Confluence check</label>
+          <label title="Off = previous behaviour. On = adds an optional 15-minute timeframe for entry timing (crypto and NSE). Higher timeframes still decide the bias."><input type="checkbox" id="tdd-friend-opt-m15"> 15m candles</label>
+          <label title="Off = previous behaviour. On = adds order blocks and equal highs/lows (liquidity pools) on the daily and 4H as extra key levels."><input type="checkbox" id="tdd-friend-opt-extrasmc"> Extra SMC</label>
+          <label title="Off = previous behaviour. On = code computes entry zone, stop, targets and R:R for long and short; the AI must quote them. Every trade it suggests is saved to the Suggested trades list below."><input type="checkbox" id="tdd-friend-opt-trademap"> Trade map</label>
+          <label title="Off = previous behaviour. On = counts how often the nearest support/resistance was tested and whether the bounces are shrinking (a weakening warning)."><input type="checkbox" id="tdd-friend-opt-weaksr"> Weakening S/R</label>
+          <label title="Off = previous behaviour. On = adds Fibonacci retracement zone (0.5–0.705) and extensions (1.272, 1.618) of the latest swing leg; also checked against the trade map entry."><input type="checkbox" id="tdd-friend-opt-fib"> Fibonacci</label>
           <span class="tdd-friend-toggles-label" style="margin-left:auto;">AI provider:</span>
           <select id="tdd-friend-provider" class="tdd-friend-provider-select" title="Which provider to try first — still falls back through the others if it fails.">
             <option value="gemini" selected>Gemini (default)</option>
@@ -871,7 +922,25 @@
         </div>
         <div class="tdd-friend-input-row">
           <textarea id="tdd-friend-input" placeholder="Ask about current structure, a setup, or paste what you're seeing..." rows="1" disabled></textarea>
+          <button class="tdd-btn ghost" id="tdd-friend-copy" disabled title="Builds the full prompt (playbook, candles, computed levels, journal) without calling any AI, so you can paste it into your own claude.ai chat.">Copy for Claude</button>
           <button class="tdd-btn" id="tdd-friend-send" disabled>Send</button>
+        </div>
+        <div class="tdd-copybox" id="tdd-copybox" style="display:none;">
+          <div class="tdd-trades-sub" id="tdd-copybox-msg"></div>
+          <textarea id="tdd-copybox-text" readonly rows="6"></textarea>
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <button class="tdd-btn small" id="tdd-copybox-copy" type="button">Copy again</button>
+            <button class="tdd-btn ghost small" id="tdd-copybox-open" type="button">Open claude.ai</button>
+            <button class="tdd-btn ghost small" id="tdd-copybox-close" type="button">Close</button>
+          </div>
+        </div>
+        <div class="tdd-trades" id="tdd-trades">
+          <div class="tdd-trades-head">
+            <span class="tdd-trades-title">Suggested trades</span>
+            <span class="tdd-trades-sub" id="tdd-trades-sub">saved automatically when the Trade map option is on</span>
+            <button class="tdd-btn ghost small" id="tdd-trades-toggle" type="button" style="display:none;">Show all</button>
+          </div>
+          <div id="tdd-trades-list"><div class="tdd-trades-empty">Sign in to see your suggested trades.</div></div>
         </div>
       </div>
     </div>
@@ -1034,6 +1103,10 @@
           <div class="tdd-check-grid" id="tdd-mistake-checks"></div>
         </div>
 
+        <div class="tdd-field"><label>bias invalidation — the price that proves your higher-timeframe read wrong</label><input type="number" id="f-invalid" step="any" placeholder="type it before you enter"></div>
+        <div class="tdd-field full" id="f-loc-row" style="display:none;"><label style="color:var(--rust);">location check — why take this trade here anyway? (required to save)</label><input type="text" id="f-loc-reason" maxlength="300" placeholder="e.g. 4H closed above the supply and retested it"></div>
+        <div class="tdd-field"><label>trend relation (for your stats)</label><select id="f-trendtag"><option value="auto">auto — from the bias banner</option><option value="with-trend">with-trend</option><option value="counter-trend">counter-trend</option><option value="unknown">unknown</option></select></div>
+        <div class="tdd-field full"><label>plan B — what will you do if this trade fails? (e.g. "stop trading until the next setup")</label><input type="text" id="f-planb" maxlength="300" placeholder="write it now, before you enter"></div>
         <div class="tdd-field full"><label>notes</label><textarea id="f-notes" placeholder="what did the structure actually look like? what were you feeling?"></textarea></div>
         <div class="tdd-field full">
           <label>reference chart screenshot (optional)</label>
@@ -1048,6 +1121,7 @@
       <div class="tdd-verdict v-green" id="tdd-verdict"></div>
 
       <div id="tdd-editing-banner" style="display:none; margin-bottom:10px; padding:10px 14px; border:1px solid var(--amber); border-radius:4px; color:var(--amber); font-size:13px;">Editing an existing trade — saving will update this entry instead of creating a new one.</div>
+      <div class="tdd-pnl-note" id="tdd-import-edit-note" style="display:none; color:var(--amber);">Imported trade — date, prices, direction and result came from your file. Fill in the setup, checks, mistakes and Plan B below; the radio buttons start at their defaults, so review them rather than trusting them.</div>
       <button class="tdd-btn" id="tdd-save">Save entry to journal</button>
       <button class="tdd-btn ghost" id="tdd-cancel-edit" type="button" style="display:none; margin-left:8px;">Cancel edit</button>
     </div>
@@ -1057,6 +1131,24 @@
       <h1 class="tdd-h1">Journal history</h1>
       <p class="tdd-sub">Every entry you've logged, most recent first. This is the record — don't edit your memory of a trade after the fact.</p>
       <div id="tdd-pnl-summary" class="tdd-pnl-wrap"></div>
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+        <button class="tdd-btn small" id="tdd-import-open" type="button">Import trades (Excel / CSV)</button>
+        <label class="tdd-check" style="font-size:12px; color:var(--text-dim);"><input type="checkbox" id="tdd-filter-needs"> Show only imported trades that still need details</label>
+      </div>
+      <div class="tdd-import" id="tdd-import" style="display:none;">
+        <div class="tdd-pnl-title">Import trades from your exchange file</div>
+        <p class="tdd-pnl-note">Pick your order-history export (.xlsx, .xls or .csv). Your buys and sells are paired into whole trades; stop-loss and target are read from the orders cancelled when a position closed, when the file has them. Nothing is saved until you press Import.</p>
+        <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-top:8px;">
+          <div class="tdd-field" style="margin:0;"><label>file</label><input type="file" id="tdd-import-file" accept=".csv,.xls,.xlsx,.xlsm"></div>
+          <div class="tdd-field" style="margin:0;"><label>account size then (optional — same currency as the file)</label><input type="number" id="tdd-import-capital" min="0" step="any" placeholder="e.g. 1000"></div>
+        </div>
+        <p class="tdd-pnl-note" id="tdd-import-msg"></p>
+        <div class="tdd-imp-scroll" id="tdd-import-table"></div>
+        <div style="margin-top:10px; display:flex; gap:8px;">
+          <button class="tdd-btn" id="tdd-import-go" type="button" disabled>Import selected</button>
+          <button class="tdd-btn ghost" id="tdd-import-close" type="button">Close</button>
+        </div>
+      </div>
       <div id="tdd-entries"></div>
       <button class="tdd-btn ghost small" id="tdd-clear-all" style="margin-top:10px;">Clear all entries</button>
     </div>
@@ -1298,6 +1390,7 @@
     $('#tv-iframe').src = buildTVUrl(symbol);
     const friendSym = $('#tdd-friend-symbol');
     if (friendSym) friendSym.textContent = symbol.split(':').pop();
+    if (typeof refreshBiasBanner === 'function' && currentUser) refreshBiasBanner(false);
   }
 
   function ensureChartLoaded() {
@@ -1344,30 +1437,35 @@
   // --- playbook ---
   const pbEl = $('#tdd-playbook');
   let customStrategies = [];   // [{id, name, tag, concepts[], img, createdAt}] — synced at strategies/<uid>/custom/<id>
-  let stratEditingId = null, stratImgData = null, stratLoadSeq = 0;
+  let stratEditingId = null, stratEditingBuiltin = null, stratImgData = null, stratLoadSeq = 0;
+  let builtinOverrides = {};   // { <slug of original name>: {name, tag, concepts[], img?} } — synced at strategies/<uid>/overrides/<slug>
+  function effBuiltin(s) { const ov = builtinOverrides[slugify(s.name)]; return ov ? Object.assign({}, s, { name: ov.name, tag: ov.tag, concepts: ov.concepts, img: ov.img || s.img }) : s; }
   function escHtml(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
-  function playCardHtml(s, custom) {
+  function playCardHtml(s, custom, slug, edited) {
     const badgeClass = s.tag === 'long' ? 'badge-long' : (s.tag === 'short' ? 'badge-short' : 'badge-warn');
     const badgeText = s.tag === 'long' ? 'LONG' : (s.tag === 'short' ? 'SHORT' : 'ANTI-PATTERN');
     return (s.img ? '<img src="' + escHtml(s.img) + '" alt="' + escHtml(s.name) + ' reference chart">' : '') +
       '<div class="inner"><div class="head"><div class="name">' + escHtml(s.name) + '</div><div class="badge ' + badgeClass + '">' + badgeText + '</div></div>' +
       '<ul>' + (s.concepts || []).map(c => '<li>' + escHtml(c) + '</li>').join('') + '</ul>' +
       (custom ? '<div class="tdd-custom-actions"><span class="tdd-custom-tag">YOUR STRATEGY</span><button class="tdd-btn ghost small" data-strat-edit="' + escHtml(s.id) + '">Edit</button><button class="tdd-btn ghost small" data-strat-del="' + escHtml(s.id) + '">Delete</button></div>' : '') +
+      (slug ? '<div class="tdd-custom-actions">' + (edited ? '<span class="tdd-custom-tag">EDITED</span>' : '') + '<button class="tdd-btn ghost small" data-bstrat-edit="' + escHtml(slug) + '">Edit</button>' + (edited ? '<button class="tdd-btn ghost small" data-bstrat-reset="' + escHtml(slug) + '">Reset to original</button>' : '') + '</div>' : '') +
       '</div>';
   }
   function renderPlaybook() {
     pbEl.innerHTML = '';
-    STRATEGIES.forEach(s => { const d = document.createElement('div'); d.className = 'tdd-play-card'; d.innerHTML = playCardHtml(s, false); pbEl.appendChild(d); });
+    STRATEGIES.forEach(s => { const d = document.createElement('div'); d.className = 'tdd-play-card'; const slug = slugify(s.name); d.innerHTML = playCardHtml(effBuiltin(s), false, slug, !!builtinOverrides[slug]); pbEl.appendChild(d); });
     customStrategies.forEach(s => { const d = document.createElement('div'); d.className = 'tdd-play-card'; d.innerHTML = playCardHtml(s, true); pbEl.appendChild(d); });
     const n = STRATEGIES.length + customStrategies.length;
+    rebuildSetupSelect();
     const sub = $('#panel-playbook .tdd-sub');
     if (sub) sub.innerHTML = 'The ' + STRATEGIES.length + ' setups you already defined as working' + (customStrategies.length ? ', plus ' + customStrategies.length + ' you added' : '') + ', with reference charts. If a trade doesn\'t match one of these, it isn\'t a setup — it\'s the ' + (n + 1) + 'th entry, and that one has never worked.';
   }
   renderPlaybook();
 
   function stratStatus(t) { $('#tdd-strat-status').textContent = t || ''; }
-  function openStratForm(st) {
-    stratEditingId = st ? st.id : null;
+  function openStratForm(st, builtinSlug) {
+    stratEditingId = st && !builtinSlug ? st.id : null;
+    stratEditingBuiltin = builtinSlug || null;
     stratImgData = st && st.img ? st.img : null;
     $('#tdd-strat-form-title').textContent = st ? 'Edit strategy' : 'New strategy';
     $('#tdd-strat-name').value = st ? st.name : '';
@@ -1380,7 +1478,7 @@
     $('#tdd-strat-form').classList.add('open');
     $('#tdd-strat-name').focus();
   }
-  function closeStratForm() { $('#tdd-strat-form').classList.remove('open'); stratEditingId = null; stratImgData = null; }
+  function closeStratForm() { $('#tdd-strat-form').classList.remove('open'); stratEditingId = null; stratEditingBuiltin = null; stratImgData = null; }
   async function loadCustomStrategies() {
     if (!currentUser || !db) return;
     const seq = ++stratLoadSeq;
@@ -1390,10 +1488,12 @@
       const v = snap.val() || {};
       customStrategies = Object.keys(v).map(k => ({ id: k, name: v[k].name || '', tag: v[k].tag || 'long', concepts: Array.isArray(v[k].concepts) ? v[k].concepts : [], img: v[k].img || null, createdAt: v[k].createdAt || 0 }))
         .sort((a, b) => a.createdAt - b.createdAt);
+      try { const os = await db.ref('strategies/' + currentUser.uid + '/overrides').once('value'); if (seq === stratLoadSeq) builtinOverrides = os.val() || {}; } catch (e) { /* overrides are optional */ }
+      if (seq !== stratLoadSeq) return;
       renderPlaybook();
     } catch (e) { /* playbook still shows built-ins */ }
   }
-  function clearCustomStrategies() { stratLoadSeq++; customStrategies = []; closeStratForm(); renderPlaybook(); }
+  function clearCustomStrategies() { stratLoadSeq++; customStrategies = []; builtinOverrides = {}; closeStratForm(); renderPlaybook(); }
   async function saveStrategy() {
     if (!currentUser || !db) { openAuthModal(); return; }
     const name = $('#tdd-strat-name').value.trim();
@@ -1402,6 +1502,16 @@
     if (!concepts.length) { stratStatus('add at least one condition'); return; }
     const btn = $('#tdd-strat-save'); btn.disabled = true; stratStatus('saving…');
     try {
+      if (stratEditingBuiltin) {
+        const slug = stratEditingBuiltin;
+        const orig = STRATEGIES.find(x => slugify(x.name) === slug);
+        const rec = { name: name, tag: $('#tdd-strat-tag').value, concepts: concepts, img: (stratImgData && orig && stratImgData !== orig.img) ? stratImgData : null, updatedAt: Date.now() };
+        await db.ref('strategies/' + currentUser.uid + '/overrides/' + slug).set(rec);
+        builtinOverrides[slug] = rec;
+        renderPlaybook(); closeStratForm();
+        $('#tdd-sync-status').textContent = 'Saved your edit to "' + name + '" — the trading friend will use your version.';
+        return;
+      }
       const ref = db.ref('strategies/' + currentUser.uid + '/custom');
       const id = stratEditingId || ref.push().key;
       const prev = customStrategies.find(x => x.id === id);
@@ -1436,6 +1546,20 @@
     reader.readAsDataURL(file);
   });
   pbEl.addEventListener('click', async (ev) => {
+    const bed = ev.target.closest('[data-bstrat-edit]'), brs = ev.target.closest('[data-bstrat-reset]');
+    if (bed) {
+      if (!currentUser) { openAuthModal(); return; }
+      const orig = STRATEGIES.find(x => slugify(x.name) === bed.dataset.bstratEdit);
+      if (orig) { openStratForm(effBuiltin(orig), bed.dataset.bstratEdit); $('#tdd-strat-form-title').textContent = 'Edit built-in strategy'; $('#tdd-strat-form').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      return;
+    }
+    if (brs) {
+      const slug = brs.dataset.bstratReset;
+      if (!currentUser || !confirm('Reset this strategy to the original version?')) return;
+      try { await db.ref('strategies/' + currentUser.uid + '/overrides/' + slug).remove(); delete builtinOverrides[slug]; renderPlaybook(); }
+      catch (e) { alert('Could not reset: ' + (e.message || e)); }
+      return;
+    }
     const ed = ev.target.closest('[data-strat-edit]'), del = ev.target.closest('[data-strat-del]');
     if (ed) { const st = customStrategies.find(x => x.id === ed.dataset.stratEdit); if (st) { openStratForm(st); $('#tdd-strat-form').scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
     if (del) {
@@ -1780,17 +1904,166 @@
     if (cfg) el.innerHTML = patternSvg(cfg);
   });
 
-  // --- setup select ---
+  // --- bias banner / counter-trend check (weekly + daily structure from the Worker, closed candles only) ---
+  let biasCache = {}, biasInflight = {}, biasBannerSymbol = null;
+  function biasKey(sym) {
+    const u = String(sym || '').trim().toUpperCase();
+    if (!u) return '';
+    return /^(NSE|BSE):/.test(u) ? u : u.split(':').pop().replace(/[^A-Z0-9]/g, '');
+  }
+  function fmtSince(d) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || ''); if (!m) return d || '';
+    const dt = new Date(+m[1], +m[2] - 1, +m[3]);
+    return dt.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: dt.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+  }
+  async function fetchBias(symbolRaw, force) {
+    const key = biasKey(symbolRaw);
+    if (!key || !currentUser) return null;
+    const c = biasCache[key];
+    if (!force && c && c.data && Date.now() - c.at < 5 * 60000) return c.data;
+    if (biasInflight[key]) return biasInflight[key];
+    biasInflight[key] = (async () => {
+      try {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch(TRADING_FRIEND_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: idToken, symbol: symbolRaw, biasOnly: true }) });
+        let data = {}; try { data = await res.json(); } catch (e) {}
+        if (res.ok && data.bias) { biasCache[key] = { data: data.bias, at: Date.now() }; return data.bias; }
+        biasCache[key] = { data: null, at: Date.now(), err: data.error || ('HTTP ' + res.status) };
+        return null;
+      } catch (e) { biasCache[key] = { data: null, at: Date.now(), err: String(e.message || e) }; return null; }
+      finally { delete biasInflight[key]; }
+    })();
+    return biasInflight[key];
+  }
+  function biasCellHtml(t) {
+    if (!t) return '';
+    const shifting = /^shifting/.test(t.status);
+    const cls = shifting ? 'shifting' : (t.trend === 'bearish' ? 'bearish' : t.trend === 'bullish' ? 'bullish' : '');
+    const label = shifting ? (t.trend.toUpperCase() + ' — shift ' + (t.status === 'shifting-up' ? 'UP' : 'DOWN') + ' in progress') : t.trend.toUpperCase();
+    const inv = t.invalidation != null ? ' · invalid only on a CLOSE ' + (t.trend === 'bearish' ? 'above ' : 'below ') + fmtNum(t.invalidation)
+      : (t.swingHigh != null && t.swingLow != null ? ' · range ' + fmtNum(t.swingLow) + '–' + fmtNum(t.swingHigh) : '');
+    return '<div class="tdd-bias-cell ' + cls + '"><b>' + escHtml(t.label) + ': ' + escHtml(label) + '</b>' + (t.since ? ' since ' + escHtml(fmtSince(t.since)) : '') + escHtml(inv) +
+      (t.zone ? ' · price in ' + escHtml(t.zone) + (t.zonePos != null && /^(premium|discount)$/.test(t.zone) ? ' (' + t.zonePos + '% of range)' : '') : '') +
+      (t.testing ? '<div class="n">Price is trading through that level right now — the bias only breaks if the candle CLOSES beyond it.</div>' : '') +
+      (t.note ? '<div class="n">' + escHtml(t.note) + '</div>' : '') + biasLocLine(t) + '</div>';
+  }
+  // where price has rejected before: nearest unfilled FVG and swing level on each side of price
+  function biasLocLine(t) {
+    if (!t || t.label === 'Weekly') return '';
+    const p = [];
+    if (t.supply) p.push('supply (unfilled bearish FVG) ' + (t.supply.inside ? 'price is INSIDE it: ' : 'above: ') + fmtNum(t.supply.lo) + '–' + fmtNum(t.supply.hi) + (t.supply.inside ? '' : ' (' + t.supply.pctAway + '% away)'));
+    if (t.resistance != null) p.push('swing-high resistance ' + fmtNum(t.resistance));
+    if (t.demand) p.push('demand (unfilled bullish FVG) ' + (t.demand.inside ? 'price is INSIDE it: ' : 'below: ') + fmtNum(t.demand.lo) + '–' + fmtNum(t.demand.hi) + (t.demand.inside ? '' : ' (' + t.demand.pctAway + '% away)'));
+    if (t.support != null) p.push('swing-low support ' + fmtNum(t.support));
+    return p.length ? '<div class="n" style="color:var(--text-dim);">' + escHtml(p.join(' · ')) + '</div>' : '';
+  }
+  function renderBiasBanner(bias, errText) {
+    const box = $('#tdd-bias');
+    if (!box) return;
+    if (!currentUser || !isFriendAdmin()) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    $('#tdd-bias-sym').textContent = String(tvSymbol).split(':').pop();
+    if (!bias) { $('#tdd-bias-asof').textContent = ''; $('#tdd-bias-cells').innerHTML = '<div class="tdd-bias-cell">' + escHtml(errText || 'Reading weekly and daily structure…') + '</div>'; return; }
+    $('#tdd-bias-asof').textContent = 'updated ' + new Date(bias.asOf || Date.now()).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) + ' · structure read on closed candles only';
+    $('#tdd-bias-cells').innerHTML = biasCellHtml(bias.weekly) + biasCellHtml(bias.daily) + biasCellHtml(bias.ltf);
+  }
+  // Remembers the last bias per symbol (bias/<uid>/<symbol>/current) and logs every change in bias/<uid>/<symbol>/history.
+  async function persistBias(symbolRaw, bias) {
+    if (!currentUser || !db || !bias) return;
+    const key = biasKey(symbolRaw).replace(/[.#$\[\]\/:]/g, '_'); if (!key) return;
+    const pick = t => t ? { status: t.status, since: t.since || null, invalidation: t.invalidation == null ? null : t.invalidation } : null;
+    const cur = { weekly: pick(bias.weekly), daily: pick(bias.daily), price: (bias.daily || bias.weekly || {}).price || null, checkedAt: Date.now() };
+    try {
+      const base = db.ref('bias/' + currentUser.uid + '/' + key);
+      const prev = (await base.child('current').once('value')).val();
+      const st = o => (o && o.status) || '';
+      if (prev && (st(prev.weekly) !== st(cur.weekly) || st(prev.daily) !== st(cur.daily))) {
+        await base.child('history').push({ ts: Date.now(), from: { weekly: st(prev.weekly), daily: st(prev.daily) }, to: { weekly: st(cur.weekly), daily: st(cur.daily) }, price: cur.price });
+      }
+      await base.child('current').set(cur);
+    } catch (e) { /* rules for "bias" may not exist yet — the banner still works */ }
+  }
+  async function refreshBiasBanner(force) {
+    if (!currentUser || !isFriendAdmin()) { renderBiasBanner(null); return; }
+    const sym = tvSymbol; biasBannerSymbol = biasKey(sym);
+    if (!$('#tdd-bias-cells').innerHTML) renderBiasBanner(null);
+    const b = await fetchBias(sym, !!force);
+    if (biasKey(tvSymbol) !== biasBannerSymbol) return; // symbol changed while loading
+    if (b) { renderBiasBanner(b); persistBias(sym, b); }
+    else { const c = biasCache[biasKey(sym)]; renderBiasBanner(null, 'Could not read the bias for ' + String(sym).split(':').pop() + (c && c.err ? ' — ' + c.err : '') + ' (deploy the latest Worker if you have not).'); }
+  }
+  function computeTrendTag(dir, b) {
+    if (!b) return 'unknown';
+    const want = dir === 'Long' ? 'bullish' : 'bearish', opp = dir === 'Long' ? 'bearish' : 'bullish';
+    const d = b.daily && b.daily.trend, w = b.weekly && b.weekly.trend;
+    if (d === opp || w === opp) return 'counter-trend';
+    if (d === want) return 'with-trend';
+    return 'unknown';
+  }
+  // bias for the symbol typed in the form (falls back to the chart symbol when the form's symbol is empty)
+  function formBias() {
+    const typed = $('#f-symbol').value.trim(), cb = biasCache[biasKey(typed || tvSymbol)];
+    return cb && cb.data ? cb.data : null;
+  }
+  // Location check: premium/discount of the entry price inside each timeframe's last swing range, entry inside an
+  // unfilled FVG against the trade, and supply / swing levels that sit between the entry and the target.
+  function locationCheck(dir, entry, target, b) {
+    const reds = [], ambers = [];
+    if (!b) return { reds: reds, ambers: ambers };
+    const lng = dir === 'Long';
+    if (!(entry > 0)) entry = (b.daily || b.ltf || {}).price;
+    if (!(entry > 0)) return { reds: reds, ambers: ambers };
+    [b.daily, b.ltf].forEach(t => {
+      if (!t) return;
+      if (t.swingHigh != null && t.swingLow != null && t.swingHigh > t.swingLow) {
+        const eq = (t.swingHigh + t.swingLow) / 2, pos = Math.round((entry - t.swingLow) / (t.swingHigh - t.swingLow) * 100);
+        if (lng && entry >= eq) reds.push("Location: this Long is at " + pos + "% of the " + t.label + " swing range " + fmtNum(t.swingLow) + "–" + fmtNum(t.swingHigh) + " — PREMIUM, where the market tends to reject. Longs belong in discount (below " + fmtNum(eq) + ").");
+        if (!lng && entry <= eq) reds.push("Location: this Short is at " + pos + "% of the " + t.label + " swing range " + fmtNum(t.swingLow) + "–" + fmtNum(t.swingHigh) + " — DISCOUNT, where the market tends to bounce. Shorts belong in premium (above " + fmtNum(eq) + ").");
+      }
+      const z = lng ? t.supply : t.demand;
+      if (z) {
+        if (entry >= z.lo && entry <= z.hi) reds.push("Location: your entry is INSIDE an unfilled " + (lng ? "bearish FVG (supply)" : "bullish FVG (demand)") + " on " + t.label + " " + fmtNum(z.lo) + "–" + fmtNum(z.hi) + ". Price reacts from these zones.");
+        else if (target > 0 && (lng ? (z.lo > entry && z.lo < target) : (z.hi < entry && z.hi > target))) ambers.push("Location: an unfilled " + (lng ? "bearish FVG (supply)" : "bullish FVG (demand)") + " on " + t.label + " " + fmtNum(z.lo) + "–" + fmtNum(z.hi) + " sits between your entry and your target — expect a reaction there.");
+      }
+      const lvl = lng ? t.resistance : t.support;
+      if (lvl != null && target > 0 && (lng ? (lvl > entry && lvl < target) : (lvl < entry && lvl > target))) ambers.push("Location: the " + t.label + " swing " + (lng ? "high " : "low ") + fmtNum(lvl) + " lies between your entry and your target — price has turned there before.");
+    });
+    return { reds: Array.from(new Set(reds)), ambers: Array.from(new Set(ambers)) };
+  }
+  function currentLocationCheck() {
+    if (editingId || $('#f-outcome').value !== 'open') return { reds: [], ambers: [] }; // only for a live trade being logged now
+    return locationCheck($('#f-direction').value, parseFloat($('#f-entry').value), parseFloat($('#f-target').value), formBias());
+  }
+  function updateInvalidPlaceholder() {
+    const cb = biasCache[biasKey($('#f-symbol').value)], b = cb && cb.data, el = $('#f-invalid');
+    if (!el) return;
+    if (b && b.daily) {
+      const lng = $('#f-direction').value === 'Long', v = lng ? b.daily.swingLow : b.daily.swingHigh;
+      el.placeholder = v != null ? 'e.g. ' + v + ' (last daily swing ' + (lng ? 'low' : 'high') + ')' : 'type it before you enter';
+    } else el.placeholder = 'type it before you enter';
+  }
+  async function ensureFormBias() {
+    const sym = $('#f-symbol').value.trim();
+    if (sym && currentUser && isFriendAdmin()) await fetchBias(sym, false);
+    updateInvalidPlaceholder(); computeVerdict();
+  }
+  setInterval(() => { if (!document.hidden && currentUser && isFriendAdmin()) refreshBiasBanner(false); }, 15 * 60000);
+
+  // --- setup select --- (rebuilt whenever the playbook changes: built-ins as edited + your own strategies)
+  function rebuildSetupSelect() {
+    const sel = document.getElementById('f-setup');
+    if (!sel) return;
+    const keep = sel.value;
+    sel.innerHTML = '';
+    const none = document.createElement('option');
+    none.value = ''; none.textContent = 'None of these (forced trade)';
+    sel.appendChild(none);
+    const names = STRATEGIES.map(x => effBuiltin(x).name).concat(customStrategies.map(x => x.name));
+    names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+    sel.value = names.indexOf(keep) >= 0 ? keep : '';
+  }
+  rebuildSetupSelect();
   const setupSel = $('#f-setup');
-  STRATEGIES.forEach(s => {
-    const o = document.createElement('option');
-    o.value = s.name; o.textContent = s.name;
-    setupSel.appendChild(o);
-  });
-  const noneOpt = document.createElement('option');
-  noneOpt.value = ''; noneOpt.textContent = 'None of these (forced trade)';
-  setupSel.insertBefore(noneOpt, setupSel.firstChild);
-  setupSel.value = '';
 
   // --- mistake checkboxes in form ---
   const mcEl = $('#tdd-mistake-checks');
@@ -1930,7 +2203,7 @@
       // trade with no mistakes checked), so `mistakes`/`marksDrawn` can come back as undefined.
       // Default them here so rendering never crashes on a missing field.
       .map(k => Object.assign({ id: k, mistakes: [], marksDrawn: [] }, val[k]))
-      .sort((a, b) => b.id.localeCompare(a.id)); // Firebase push keys sort chronologically — newest first
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.id.localeCompare(a.id)); // newest trade date first; push keys break ties
   }
 
   function attachPositionsListener(uid) {
@@ -1972,7 +2245,7 @@
         closeAuthModal();
         if (pendingSaveAfterAuth) { pendingSaveAfterAuth = false; doSaveEntry(); }
         if (pendingPlaybookSyncAfterAuth) { pendingPlaybookSyncAfterAuth = false; doSyncPlaybook(); }
-        if (isFriendAdmin()) loadFriendHistory();
+        if (isFriendAdmin()) { loadFriendHistory(); loadSuggestedTrades(); refreshBiasBanner(true); }
         loadPlan();
         loadFeeSetting();
         loadCustomStrategies();
@@ -1986,6 +2259,8 @@
         clearFriendMessages();
         friendHistory = [];
         $('#tdd-friend-count').textContent = '';
+        suggestedTrades = []; tradesLoadSeq++; renderSuggestedTrades();
+        biasCache = {}; renderBiasBanner(null);
       }
     });
   } else {
@@ -2009,6 +2284,7 @@
     const locked = $('#tdd-friend-locked');
     const input = $('#tdd-friend-input');
     const send = $('#tdd-friend-send');
+    const copyBtn = $('#tdd-friend-copy');
     const quick = $('#tdd-friend-quick');
     if (!gate) return;
     const admin = isFriendAdmin();
@@ -2017,6 +2293,7 @@
     $('.tdd-friend').classList.toggle('tdd-friend-adminonly', !!currentUser && !admin);
     input.disabled = !admin;
     send.disabled = !admin;
+    copyBtn.disabled = !admin;
     quick.disabled = !admin;
   }
   const friendSigninBtn = document.getElementById('tdd-friend-signin');
@@ -2181,12 +2458,63 @@
     }
   }
 
+
+  // --- suggested trades: the trade map's levels are saved on the assistant message (chats/<uid>/<id>/trade) ---
+  let suggestedTrades = [], tradesShowAll = false, tradesLoadSeq = 0;
+  function fmtNum(n) { return (n == null || isNaN(n)) ? 'n/a' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+  async function loadSuggestedTrades() {
+    if (!currentUser || !db) return;
+    const seq = ++tradesLoadSeq;
+    try {
+      const snap = await db.ref('chats/' + currentUser.uid).orderByChild('ts').limitToLast(600).once('value');
+      if (seq !== tradesLoadSeq) return;
+      const out = [];
+      snap.forEach(child => { const v = child.val(); if (v && v.trade && v.trade.dir) out.push({ id: child.key, ts: v.ts || 0, symbol: v.symbol || '', trade: v.trade }); });
+      out.sort((a, b) => b.ts - a.ts);
+      suggestedTrades = out;
+      renderSuggestedTrades();
+    } catch (e) {
+      $('#tdd-trades-list').innerHTML = '<div class="tdd-trades-empty">Could not load suggested trades: ' + escHtml(e.message || e) + '</div>';
+    }
+  }
+  function renderSuggestedTrades() {
+    const list = $('#tdd-trades-list'), btn = $('#tdd-trades-toggle');
+    if (!list) return;
+    if (!currentUser) { list.innerHTML = '<div class="tdd-trades-empty">Sign in to see your suggested trades.</div>'; btn.style.display = 'none'; return; }
+    if (!suggestedTrades.length) { list.innerHTML = '<div class="tdd-trades-empty">No suggested trades yet — tick "Trade map" and ask for a trade idea; each long/short it suggests is saved here.</div>'; btn.style.display = 'none'; return; }
+    const shown = tradesShowAll ? suggestedTrades : suggestedTrades.slice(0, 5);
+    btn.style.display = suggestedTrades.length > 5 ? '' : 'none';
+    btn.textContent = tradesShowAll ? 'Show last 5' : 'Show all (' + suggestedTrades.length + ')';
+    $('#tdd-trades-sub').textContent = 'showing ' + shown.length + ' of ' + suggestedTrades.length + ' — click a row for details';
+    list.innerHTML = shown.map(x => {
+      const t = x.trade, d = new Date(x.ts);
+      const t1 = (t.targets && t.targets[0]) || null;
+      const risk = (t.entry != null && t.stop != null) ? Math.abs(t.entry - t.stop) : null;
+      const isIndia = /^(NSE|BSE):/i.test(x.symbol || '');
+      const fee = (!isIndia && risk) ? ' · fees ≈ ' + (feePoints / risk).toFixed(2) + 'R' : '';
+      const targets = (t.targets || []).map((g, i) => 'T' + (i + 1) + ' ' + fmtNum(g.price) + ' (' + escHtml(g.label) + ') → ' + (g.rr != null ? g.rr + 'R' : 'n/a')).join('<br>');
+      return '<div class="tdd-trade" data-trade="' + escHtml(x.id) + '"><div class="tdd-trade-main">' +
+        '<span class="tdd-trade-dir ' + (t.dir === 'short' ? 'short' : 'long') + '">' + (t.dir === 'short' ? 'SHORT' : 'LONG') + '</span>' +
+        '<span class="tdd-trade-sym">' + escHtml(t.symbol || x.symbol) + '</span>' +
+        '<span class="tdd-trade-time">' + escHtml(d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })) + '</span>' +
+        '<span class="tdd-trade-nums">entry ' + fmtNum(t.entry) + ' · stop ' + fmtNum(t.stop) + (t1 ? ' · T1 ' + fmtNum(t1.price) + (t1.rr != null ? ' (' + t1.rr + 'R)' : '') : '') + fee + '</span>' +
+        '</div><div class="tdd-trade-detail">' +
+        'Entry: ' + escHtml(t.entryNote || '') + '<br>' +
+        'Price when suggested: ' + fmtNum(t.price) + (risk ? ' · risk ' + fmtNum(risk) + ' pts' : '') + '<br>' +
+        (targets ? targets + '<br>' : '') +
+        'Verdict: ' + escHtml(t.verdict || '') + (t.fibNote ? '<br>Fib: ' + escHtml(t.fibNote) : '') +
+        '</div></div>';
+    }).join('');
+  }
+  $('#tdd-trades-toggle').addEventListener('click', () => { tradesShowAll = !tradesShowAll; renderSuggestedTrades(); });
+  $('#tdd-trades-list').addEventListener('click', (ev) => { const row = ev.target.closest('.tdd-trade'); if (row) row.classList.toggle('open'); });
+
   async function saveFriendExchange(userText, userTs, reply, replyTs, data) {
     if (!currentUser || !db) return;
     try {
       const ref = db.ref('chats/' + currentUser.uid);
       await ref.push({ role: 'user', content: userText, ts: userTs, symbol: tvSymbol });
-      await ref.push({ role: 'assistant', content: reply, ts: replyTs, symbol: tvSymbol, provider: data.aiProvider || null, model: data.aiModel || null });
+      await ref.push(Object.assign({ role: 'assistant', content: reply, ts: replyTs, symbol: tvSymbol, provider: data.aiProvider || null, model: data.aiModel || null }, data.trade ? { trade: data.trade } : {}));
     } catch (e) {
       appendFriendMsg('error', "This exchange couldn't be saved to your history: " + (e.message || e) + ' — check the Firebase rules for "chats".');
     }
@@ -2212,7 +2540,13 @@
         structure: $('#tdd-friend-opt-structure').checked,
         smc: $('#tdd-friend-opt-smc').checked,
         volatility: $('#tdd-friend-opt-volatility').checked,
-        bigPicture: $('#tdd-friend-opt-bigpicture').checked
+        bigPicture: $('#tdd-friend-opt-bigpicture').checked,
+        confluence: $('#tdd-friend-opt-confluence').checked,
+        m15: $('#tdd-friend-opt-m15').checked,
+        extraSmc: $('#tdd-friend-opt-extrasmc').checked,
+        tradeMap: $('#tdd-friend-opt-trademap').checked,
+        weakSR: $('#tdd-friend-opt-weaksr').checked,
+        fib: $('#tdd-friend-opt-fib').checked
       };
       const preferredProvider = $('#tdd-friend-provider').value;
       const res = await fetch(TRADING_FRIEND_ENDPOINT, {
@@ -2232,7 +2566,8 @@
       const repliedAt = Date.now();
       appendFriendMsg('assistant', reply, modelTag, repliedAt);
       friendHistory.push({ role: 'assistant', content: reply });
-      saveFriendExchange(text, sentAt, reply, repliedAt, data);
+      if (data.bias) { biasCache[biasKey(tvSymbol)] = { data: data.bias, at: Date.now() }; renderBiasBanner(data.bias); persistBias(tvSymbol, data.bias); computeVerdict(); }
+      saveFriendExchange(text, sentAt, reply, repliedAt, data).then(() => { if (data.trade) loadSuggestedTrades(); });
     } catch (e) {
       removeFriendTyping();
       appendFriendMsg('error', 'Could not reach the trading friend backend. ' + (e.message || e));
@@ -2262,6 +2597,58 @@
     sendFriendMessage("What's your take on the current market structure on " + tvSymbol.split(':').pop() + "? Give me your best trade if there is one.");
   });
 
+
+  // remember the analysis tick-boxes between visits (Bigger-picture rule starts ticked)
+  const FRIEND_OPT_KEYS = ['structure', 'smc', 'volatility', 'bigpicture', 'confluence', 'm15', 'extrasmc', 'trademap', 'weaksr', 'fib'];
+  try {
+    const savedOpts = JSON.parse(localStorage.getItem('tdd_friend_opts') || 'null');
+    if (savedOpts) FRIEND_OPT_KEYS.forEach(k => { const el = $('#tdd-friend-opt-' + k); if (el && typeof savedOpts[k] === 'boolean') el.checked = savedOpts[k]; });
+  } catch (e) {}
+  FRIEND_OPT_KEYS.forEach(k => { const el = $('#tdd-friend-opt-' + k); if (el) el.addEventListener('change', () => {
+    try { const o = {}; FRIEND_OPT_KEYS.forEach(j => { o[j] = $('#tdd-friend-opt-' + j).checked; }); localStorage.setItem('tdd_friend_opts', JSON.stringify(o)); } catch (e) {}
+  }); });
+
+  // --- "Copy for Claude": same request as Send, but the Worker returns the prompt instead of calling an AI ---
+  function friendAnalysisOpts() {
+    return {
+      structure: $('#tdd-friend-opt-structure').checked, smc: $('#tdd-friend-opt-smc').checked, volatility: $('#tdd-friend-opt-volatility').checked,
+      bigPicture: $('#tdd-friend-opt-bigpicture').checked, confluence: $('#tdd-friend-opt-confluence').checked, m15: $('#tdd-friend-opt-m15').checked,
+      extraSmc: $('#tdd-friend-opt-extrasmc').checked, tradeMap: $('#tdd-friend-opt-trademap').checked, weakSR: $('#tdd-friend-opt-weaksr').checked, fib: $('#tdd-friend-opt-fib').checked
+    };
+  }
+  async function copyTextToClipboard(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+    try { const ta = $('#tdd-copybox-text'); ta.focus(); ta.select(); return document.execCommand('copy'); } catch (e) { return false; }
+  }
+  async function copyForClaude() {
+    if (friendBusy) return;
+    if (!currentUser) { openAuthModal(); return; }
+    if (!isFriendAdmin()) return;
+    if (!TRADING_FRIEND_ENDPOINT || TRADING_FRIEND_ENDPOINT.indexOf('YOUR-WORKER-SUBDOMAIN') !== -1) { appendFriendMsg('error', "Trading friend isn't connected yet — see SETUP.md."); return; }
+    const typed = friendInput.value.trim();
+    const question = typed || ("What's your take on the current market structure on " + tvSymbol.split(':').pop() + "? Give me your best trade if there is one.");
+    const btn = $('#tdd-friend-copy'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Building…';
+    const box = $('#tdd-copybox');
+    try {
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch(TRADING_FRIEND_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: idToken, message: question, symbol: tvSymbol, analysis: friendAnalysisOpts(), promptOnly: true }) });
+      let data = {}; try { data = await res.json(); } catch (e) {}
+      if (!res.ok || data.error || !data.prompt) { appendFriendMsg('error', data.error || (res.ok ? 'The Worker did not return a prompt — deploy the latest Worker (src/index.js).' : 'Request failed (HTTP ' + res.status + ').')); return; }
+      $('#tdd-copybox-text').value = data.prompt;
+      box.style.display = 'block';
+      const ok = await copyTextToClipboard(data.prompt);
+      $('#tdd-copybox-msg').textContent = (ok ? 'Copied to your clipboard' : 'Could not copy automatically — select the text below and copy it') + ' (' + data.prompt.length.toLocaleString() + ' characters). Paste it into a new chat on claude.ai. Nothing was sent to any AI and nothing was saved.';
+    } catch (e) {
+      appendFriendMsg('error', 'Could not reach the trading friend backend. ' + (e.message || e));
+    } finally { btn.textContent = old; btn.disabled = !isFriendAdmin(); }
+  }
+  $('#tdd-friend-copy').addEventListener('click', copyForClaude);
+  $('#tdd-copybox-copy').addEventListener('click', async () => { const ok = await copyTextToClipboard($('#tdd-copybox-text').value); $('#tdd-copybox-msg').textContent = ok ? 'Copied again.' : 'Could not copy automatically — select the text and copy it.'; });
+  $('#tdd-copybox-open').addEventListener('click', () => { window.open('https://claude.ai/new', '_blank', 'noopener'); });
+  $('#tdd-bias-refresh').addEventListener('click', () => refreshBiasBanner(true));
+  $('#tdd-copybox-close').addEventListener('click', () => { $('#tdd-copybox').style.display = 'none'; });
+
   // history date filter: defaults to the last 5 days
   function setFriendFromDays(daysBack) {
     const d = new Date();
@@ -2271,7 +2658,7 @@
   // Permanently deletes every saved message at chats/<uid> (not just the date range on screen).
   $('#tdd-friend-clear').addEventListener('click', async () => {
     if (!currentUser || !db) { openAuthModal(); return; }
-    if (!confirm('Delete ALL saved chat history from your account?\n\nThis removes every message in the database (not just the date range shown) and can\'t be undone. Your journal, strategies and plan are not affected.')) return;
+    if (!confirm('Delete ALL saved chat history from your account?\n\nThis removes every message in the database (not just the date range shown) — including the Suggested trades list, which is stored in it — and can\'t be undone. Your journal, strategies and plan are not affected.')) return;
     const btn = $('#tdd-friend-clear');
     btn.disabled = true;
     friendLoadSeq++; // drop any history load still in flight so it can't repaint old messages
@@ -2279,6 +2666,7 @@
       await db.ref('chats/' + currentUser.uid).remove();
       clearFriendMessages();
       friendHistory = [];
+      suggestedTrades = []; renderSuggestedTrades();
       $('#tdd-friend-count').textContent = '0 messages';
       setFriendNote('Chat history deleted. New messages will start a fresh history.');
     } catch (e) {
@@ -2414,6 +2802,18 @@
     if (chartPattern === 'yes-not-planned') ambers.push("You've spotted a chart pattern but haven't set target/stop from its own structure yet — a wedge, flag, or head-and-shoulders each imply their own measured-move target and invalidation point. Use it instead of guessing.");
     if (retest === 'failed') reds.push("You flagged the confirmation as failed — that's a trap, not a setup. Do not enter.");
     if (retest === 'chasing') ambers.push("Confirmation hasn't happened yet — you're entering on the shape alone. Lower probability, wider real risk than it looks.");
+    if (!$('#f-planb').value.trim()) ambers.push("No plan B written. Decide now what you'll do if this trade fails — even \"stop trading until the next setup\" counts. Without it, the next move after a loss is usually an emotional one.");
+    {
+      const isLiveTrade = !editingId && $('#f-outcome').value === 'open', bb = isLiveTrade ? formBias() : null;
+      const dirV = $('#f-direction').value, oppV = dirV === 'Long' ? 'bearish' : 'bullish';
+      if (bb) [bb.weekly, bb.daily].forEach(t => {
+        if (t && t.trend === oppV) reds.push("Counter-trend: you're going " + dirV + " into a " + t.trend.toUpperCase() + " " + t.label.toLowerCase() + " structure" + (t.since ? " (since " + fmtSince(t.since) + ")" : "") + (t.invalidation != null ? ", which only breaks on a close " + (t.trend === 'bearish' ? 'above ' : 'below ') + fmtNum(t.invalidation) : "") + ". A bounce inside it is a pullback, not a reversal — wait for that close, or accept this is a counter-trend trade.");
+      });
+      const loc = currentLocationCheck();
+      loc.reds.forEach(x => reds.push(x)); loc.ambers.forEach(x => ambers.push(x));
+      const lr = $('#f-loc-row'); if (lr) lr.style.display = loc.reds.length ? 'block' : 'none';
+      if (!$('#f-invalid').value.trim()) ambers.push("No bias-invalidation level. Type the price at which your read of the higher timeframe is wrong — if you can't name it, you're trading on a feeling.");
+    }
     if (!setup) ambers.push("No playbook setup selected — this is the forced-trade pattern that's cost you the most.");
     if (risk > 2) ambers.push("Risk is " + risk + "% of capital — above the 1–2% rule.");
     if (lev > 10) ambers.push("Leverage is " + lev + "x — high leverage plus full-size positions is your single biggest cause of wipeouts.");
@@ -2431,7 +2831,10 @@
       v.innerHTML = '<span class="lead">Structure, risk and stop-loss are in place</span>This still isn\'t a guarantee — it just means you\'re not defeating yourself before the trade even starts.';
     }
   }
-  ['#f-sl','#f-risk','#f-leverage','#f-setup','#f-retest','#f-target','#f-entry','#f-range-check','#f-chart-pattern','#f-reversal-trend-check'].forEach(sel => $(sel).addEventListener('input', () => { computeRR(); computeVerdict(); }));
+  ['#f-loc-reason','#f-invalid','#f-planb','#f-sl','#f-risk','#f-leverage','#f-setup','#f-retest','#f-target','#f-entry','#f-range-check','#f-chart-pattern','#f-reversal-trend-check'].forEach(sel => $(sel).addEventListener('input', () => { computeRR(); computeVerdict(); }));
+  $('#f-symbol').addEventListener('change', ensureFormBias);
+  $('#f-direction').addEventListener('change', () => { updateInvalidPlaceholder(); computeVerdict(); });
+  $('#f-outcome').addEventListener('change', computeVerdict);
   $$('input[name="f-bias"]').forEach(r => r.addEventListener('change', computeVerdict));
   ['#f-mark-support','#f-mark-resistance','#f-mark-trendline'].forEach(sel => $(sel).addEventListener('change', computeVerdict));
   $$('input[name="f-daily"]').forEach(r => r.addEventListener('change', computeVerdict));
@@ -2471,9 +2874,22 @@
       goodLevel: $('input[name="f-goodlevel"]:checked').value,
       bias: $('input[name="f-bias"]:checked').value,
       mistakes: checkedMistakes,
+      planB: $('#f-planb').value.trim(),
+      biasInvalidation: $('#f-invalid').value.trim(),
       notes: $('#f-notes').value,
       createdAt: Date.now()
     };
+    {
+      const cb = biasCache[biasKey($('#f-symbol').value)], bb = cb && cb.data, sel = $('#f-trendtag').value;
+      if (sel !== 'auto') entry.trendTag = sel;
+      else if (editingId) entry.trendTag = ((entries.find(x => x.id === editingId) || {}).trendTag) || 'unknown';
+      else entry.trendTag = computeTrendTag($('#f-direction').value, bb);
+      if (!editingId && bb) { entry.biasDaily = bb.daily ? bb.daily.status : ''; entry.biasWeekly = bb.weekly ? bb.weekly.status : ''; }
+    }
+    if (!editingId && $('#f-outcome').value === 'open') {
+      const lc = currentLocationCheck();
+      if (lc.reds.length) { entry.locationFlag = lc.reds.map(x => x.replace(/^Location: /, '')).join(' | ').slice(0, 400); entry.locationReason = $('#f-loc-reason').value.trim(); }
+    }
     entry.referenceImage = refImageDataUrl || null; // explicit null so editing can clear a previously-saved image
     return entry;
   }
@@ -2486,8 +2902,9 @@
 
   function resetForm() {
     editingId = null;
+    $('#tdd-import-edit-note').style.display = 'none';
     $('#f-date').value = new Date().toISOString().slice(0,10);
-    $('#f-symbol').value=''; $('#f-entry').value=''; $('#f-sl').value=''; $('#f-target').value=''; $('#f-rr').value=''; $('#f-notes').value='';
+    $('#f-symbol').value=''; $('#f-entry').value=''; $('#f-sl').value=''; $('#f-target').value=''; $('#f-rr').value=''; $('#f-notes').value=''; $('#f-planb').value=''; $('#f-invalid').value=''; $('#f-trendtag').value='auto'; $('#f-loc-reason').value='';
     $('#f-direction').value = 'Long';
     $('#f-htf').value = 'up';
     $('#f-leverage').value = '1';
@@ -2544,6 +2961,9 @@
     const mistakesSet = new Set(e.mistakes || []);
     $$('#tdd-mistake-checks input').forEach(c => { c.checked = mistakesSet.has(MISTAKES[parseInt(c.value)]); });
     $('#f-notes').value = e.notes || '';
+    $('#f-planb').value = e.planB || '';
+    $('#f-invalid').value = e.biasInvalidation || '';
+    $('#f-trendtag').value = e.trendTag || 'unknown';
     if (e.referenceImage) {
       refImageDataUrl = e.referenceImage;
       $('#f-refimage-thumb').src = e.referenceImage;
@@ -2561,6 +2981,7 @@
     const entry = entries.find(x => x.id === id);
     if (!entry) return;
     populateFormFromEntry(entry);
+    $('#tdd-import-edit-note').style.display = entry.needsDetails ? 'block' : 'none';
     editingId = id;
     setEditModeUI(true);
     goTab('log');
@@ -2569,12 +2990,19 @@
 
   async function doSaveEntry() {
     if (!currentUser || !db) return;
+    const locGate = currentLocationCheck();
+    if (locGate.reds.length && !$('#f-loc-reason').value.trim()) {
+      $('#f-loc-row').style.display = 'block'; $('#f-loc-reason').focus();
+      alert('Stop — the location check flagged this trade:\n\n• ' + locGate.reds.join('\n• ') + '\n\nWrite why you are taking it here anyway (the box is highlighted above Plan B), or change the entry.');
+      return;
+    }
     const entry = buildEntryFromForm();
     try {
       if (editingId) {
         const original = entries.find(x => x.id === editingId);
         if (original && original.createdAt) entry.createdAt = original.createdAt;
         entry.updatedAt = Date.now();
+        if (original && original.needsDetails) entry.needsDetails = null;
         await db.ref('positions/' + currentUser.uid + '/' + editingId).update(entry);
       } else {
         await db.ref('positions/' + currentUser.uid).push(entry);
@@ -2595,6 +3023,237 @@
     doSaveEntry();
   });
   $('#tdd-cancel-edit').addEventListener('click', resetForm);
+
+  // --- trade import: exchange fills file (CSV / Excel) -> whole trades ---
+  const TDDImport = (function () {
+    const norm = h => String(h == null ? '' : h).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const ALIASES = {
+      time: ['time', 'date', 'tradedate', 'executiontime', 'orderexecutiontime', 'timestamp', 'datetime', 'filltime', 'createdat'],
+      symbol: ['contract', 'symbol', 'tradingsymbol', 'instrument', 'pair', 'market', 'product'],
+      side: ['side', 'tradetype', 'buysell', 'type', 'transactiontype', 'direction'],
+      qty: ['qty', 'quantity', 'size', 'filledqty', 'amount'],
+      price: ['execprice', 'price', 'avgprice', 'averageprice', 'tradeprice', 'executionprice', 'fillprice'],
+      fee: ['tradingfees', 'fees', 'fee', 'commission', 'brokerage'],
+      orderValue: ['ordervalue', 'value', 'tradevalue', 'notional'],
+      status: ['status', 'orderstatus'],
+      stop: ['stopprice', 'triggerprice'],
+      explanation: ['explanation', 'reason'],
+      orderType: ['ordertype'],
+      filled: ['filledremaining']
+    };
+    // Small CSV parser (quotes, commas, newlines inside quotes).
+    function parseCSV(text) {
+      const rows = []; let row = [], cur = '', q = false;
+      text = String(text).replace(/^﻿/, '');
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+        else if (c === '"') q = true;
+        else if (c === ',') { row.push(cur); cur = ''; }
+        else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cur); cur = ''; if (row.some(x => x !== '')) rows.push(row); row = []; }
+        else cur += c;
+      }
+      row.push(cur); if (row.some(x => x !== '')) rows.push(row);
+      return rows;
+    }
+    const num = v => { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isNaN(n) ? null : n; };
+    // "2026-10-10 09:32:53.809567+05:30 IST Asia/Kolkata" -> { ms, date }
+    function parseTime(s) {
+      s = String(s == null ? '' : s).trim();
+      const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)(\.\d+)?\s*(Z|[+-]\d{2}:?\d{2})?/.exec(s);
+      if (m) {
+        let off = m[4] || '';
+        if (/^[+-]\d{4}$/.test(off)) off = off.slice(0, 3) + ':' + off.slice(3);
+        const t = m[2].length === 5 ? m[2] + ':00' : m[2];
+        const ms = Date.parse(m[1] + 'T' + t + (m[3] ? m[3].slice(0, 4) : '') + off);
+        return isNaN(ms) ? null : { ms: ms, date: m[1] };
+      }
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return null;
+      return { ms: d.getTime(), date: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') };
+    }
+    // matrix (array of arrays) -> { fills, stops, problem }
+    function toRecords(matrix) {
+      if (!matrix || matrix.length < 2) return { fills: [], stops: [], problem: 'The file has no rows.' };
+      // the header is the first of the top rows that names at least 3 known columns (skips title rows)
+      const score = row => { const h = row.map(norm); return Object.keys(ALIASES).filter(k => ALIASES[k].some(a => h.indexOf(a) >= 0)).length; };
+      let hi = 0;
+      for (let i = 0; i < Math.min(matrix.length, 15); i++) { if (score(matrix[i]) >= 3) { hi = i; break; } }
+      matrix = matrix.slice(hi);
+      const head = matrix[0].map(norm), col = {};
+      Object.keys(ALIASES).forEach(k => { for (const a of ALIASES[k]) { const i = head.indexOf(a); if (i >= 0) { col[k] = i; break; } } });
+      const missing = ['time', 'symbol', 'side', 'qty', 'price'].filter(k => col[k] == null);
+      if (missing.length) return { fills: [], stops: [], problem: 'Could not find these columns: ' + missing.join(', ') + '. Found: ' + matrix[0].filter(Boolean).join(', ') };
+      const get = (r, k) => (col[k] == null ? '' : r[col[k]]);
+      const fills = [], stops = [];
+      for (let ri = 1; ri < matrix.length; ri++) {
+        const r = matrix[ri];
+        const t = parseTime(get(r, 'time'));
+        const side = String(get(r, 'side')).trim().toLowerCase();
+        const status = String(get(r, 'status')).trim().toLowerCase();
+        const isBuy = side === 'buy' || side === 'b', isSell = side === 'sell' || side === 's';
+        if (!t || (!isBuy && !isSell)) continue;
+        const sgn = isBuy ? 1 : -1, symbol = String(get(r, 'symbol')).trim();
+        if (/cancel|reject|expire/.test(status)) {
+          const sp = num(get(r, 'stop'));
+          if (sp && /position_closed|closed/.test(String(get(r, 'explanation')).toLowerCase())) stops.push({ ms: t.ms, symbol: symbol, sgn: sgn, price: sp });
+          continue;
+        }
+        if (status && !/closed|filled|complete|executed|done|trade/.test(status)) continue;
+        let qty = num(get(r, 'qty'));
+        const fr = String(get(r, 'filled')).split('/')[0];
+        if (col.filled != null && num(fr) != null) qty = num(fr);
+        const price = num(get(r, 'price'));
+        if (!(qty > 0) || !(price > 0)) continue;
+        const ov = num(get(r, 'orderValue'));
+        fills.push({ ms: t.ms, date: t.date, symbol: symbol, sgn: sgn, qty: qty, price: price, fee: Math.abs(num(get(r, 'fee')) || 0), cv: ov && ov > 0 ? ov / (qty * price) : null, orderType: String(get(r, 'orderType')).toLowerCase(), stop: num(get(r, 'stop')), explanation: String(get(r, 'explanation')).toLowerCase(), seq: ri });
+      }
+      return { fills: fills, stops: stops, problem: fills.length ? null : 'No filled buy/sell rows were found in this file.' };
+    }
+    // fills -> trades (position goes flat = one trade; a fill that flips the position is split)
+    function buildTrades(fills, stops) {
+      const bySym = {};
+      fills.forEach(f => { (bySym[f.symbol] = bySym[f.symbol] || []).push(f); });
+      const trades = [];
+      Object.keys(bySym).forEach(sym => {
+        const list = bySym[sym].slice().sort((a, b) => a.ms - b.ms || a.seq - b.seq);
+        const cv = (list.find(f => f.cv) || { cv: 1 }).cv;
+        let pos = 0, cur = null;
+        const finish = (open) => {
+          if (!cur) return;
+          const qIn = cur.ins.reduce((t, x) => t + x.q, 0), qOut = cur.outs.reduce((t, x) => t + x.q, 0);
+          const entry = cur.ins.reduce((t, x) => t + x.q * x.p, 0) / qIn;
+          const exit = qOut ? cur.outs.reduce((t, x) => t + x.q * x.p, 0) / qOut : null;
+          const tr = { symbol: sym, dir: cur.dir > 0 ? 'Long' : 'Short', qty: qIn, entry: entry, exit: exit, entryMs: cur.ins[0].ms, exitMs: qOut ? cur.outs[cur.outs.length - 1].ms : null, date: cur.ins[0].date, fee: cur.fee, cv: cv, open: !!open, liquidated: cur.outs.some(o => /liquidat/.test(o.expl)), sl: null, tp: null, inferred: false };
+          if (!open) {
+            tr.gross = cur.dir * (exit - entry) * qOut * cv;
+            const closeSgn = -cur.dir, exitMs = tr.exitMs;
+            const cands = stops.filter(s => s.symbol === sym && s.sgn === closeSgn && s.ms >= exitMs - 2000 && s.ms <= exitMs + 5000).map(s => s.price);
+            cur.outs.forEach(o => { if (o.stopPrice && /stop/.test(o.ot)) cands.push(o.stopPrice); });
+            const loss = cands.filter(p => cur.dir > 0 ? p < entry : p > entry).sort((a, b) => Math.abs(a - entry) - Math.abs(b - entry));
+            const win = cands.filter(p => cur.dir > 0 ? p > entry : p < entry).sort((a, b) => Math.abs(a - entry) - Math.abs(b - entry));
+            if (loss.length) { tr.sl = loss[0]; tr.inferred = true; }
+            if (win.length) { tr.tp = win[0]; tr.inferred = true; }
+          }
+          tr.key = sym + '|' + new Date(tr.entryMs).toISOString() + '|' + tr.dir + '|' + (+qIn.toFixed(8));
+          trades.push(tr); cur = null;
+        };
+        list.forEach(f => {
+          let rem = f.qty;
+          while (rem > 1e-12) {
+            const share = take => f.fee * (take / f.qty);
+            if (pos === 0 || Math.sign(pos) === f.sgn) {
+              if (!cur) cur = { dir: f.sgn, ins: [], outs: [], fee: 0 };
+              cur.ins.push({ q: rem, p: f.price, ms: f.ms, date: f.date }); cur.fee += share(rem); pos += f.sgn * rem; rem = 0;
+            } else {
+              const take = Math.min(rem, Math.abs(pos));
+              cur.outs.push({ q: take, p: f.price, ms: f.ms, ot: f.orderType, stopPrice: f.stop, expl: f.explanation }); cur.fee += share(take); pos += f.sgn * take; rem -= take;
+              if (Math.abs(pos) < 1e-12) { pos = 0; finish(false); }
+            }
+          }
+        });
+        if (cur) finish(true);
+      });
+      return trades.sort((a, b) => a.entryMs - b.entryMs);
+    }
+    // trade -> journal entry (capital > 0 converts currency P&L / fees / risk to % of capital)
+    function toEntry(t, capital, fileName) {
+      const r2 = (n, d) => { const k = Math.pow(10, d); return Math.round(n * k) / k; };
+      const pnlUnits = t.open ? null : t.gross;
+      const outcome = t.open ? 'open' : (t.liquidated ? 'liquidated' : (pnlUnits > 0 ? 'win' : pnlUnits < 0 ? 'loss' : 'breakeven'));
+      const e = { date: t.date, symbol: t.symbol, direction: t.dir, htf: '', setup: '', leverage: '', entry: String(r2(t.entry, 8)), sl: t.sl != null ? String(t.sl) : '', target: t.tp != null ? String(t.tp) : '', rr: '', risk: '', retest: '', rangeCheck: '', reversalTrendCheck: '', chartPattern: '', bigWin: false, marksDrawn: [], outcome: outcome, pnlPct: '', daily: '', candleClosed: '', goodLevel: '', bias: '', mistakes: [], planB: '', source: 'import', needsDetails: true, importKey: t.key, createdAt: t.exitMs || t.entryMs };
+      if (t.sl != null && t.tp != null && t.sl !== t.entry) e.rr = '1 : ' + (Math.abs(t.tp - t.entry) / Math.abs(t.entry - t.sl)).toFixed(2);
+      if (capital > 0) {
+        if (pnlUnits != null) e.pnlPct = r2(pnlUnits / capital * 100, 3);
+        if (t.sl != null) e.risk = String(r2(Math.abs(t.entry - t.sl) * t.qty * t.cv / capital * 100, 2));
+        e.feePct = r2(t.fee / capital * 100, 4);
+      }
+      const bits = ['Imported' + (fileName ? ' from ' + fileName : ''), 'qty ' + r2(t.qty, 8), t.exit != null ? 'exit ' + r2(t.exit, 8) + ' (' + new Date(t.exitMs).toLocaleString() + ')' : 'still open — no exit in the file', 'fees ' + r2(t.fee, 6) + (pnlUnits != null ? ', gross P&L ' + r2(pnlUnits, 6) : '')];
+      if (t.inferred) bits.push('SL/TP inferred from the orders cancelled when the position closed — check them');
+      e.notes = bits.join(' · ');
+      return e;
+    }
+    return { parseCSV: parseCSV, toRecords: toRecords, buildTrades: buildTrades, toEntry: toEntry };
+  })();
+
+
+  // --- import UI ---
+  let importTradesList = [], importFileName = '';
+  const impEl = $('#tdd-import');
+  function impMsg(t) { $('#tdd-import-msg').textContent = t || ''; }
+  function impKeys() { return new Set(entries.map(e => e.importKey).filter(Boolean)); }
+  async function loadXlsxLib() {
+    if (window.XLSX) return window.XLSX;
+    await new Promise((res, rej) => {
+      const sc = document.createElement('script');
+      sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      sc.onload = res; sc.onerror = () => rej(new Error('Could not load the Excel reader. Save the sheet as CSV and import that instead.'));
+      document.head.appendChild(sc);
+    });
+    return window.XLSX;
+  }
+  async function readImportFile(file) {
+    if (/\.(xlsx|xls|xlsm)$/i.test(file.name)) {
+      const X = await loadXlsxLib();
+      const wb = X.read(await file.arrayBuffer(), { type: 'array' });
+      return X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
+    }
+    return TDDImport.parseCSV(await file.text());
+  }
+  function renderImportPreview() {
+    const have = impKeys();
+    const fmt = (n, d) => n == null ? '—' : (Math.round(n * Math.pow(10, d == null ? 2 : d)) / Math.pow(10, d == null ? 2 : d)).toLocaleString(undefined, { maximumFractionDigits: 8 });
+    let fresh = 0, dup = 0;
+    const rows = importTradesList.map((t, i) => {
+      const isDup = have.has(t.key); if (isDup) dup++; else fresh++;
+      const flags = (isDup ? 'already in journal' : '') + (t.open ? (isDup ? ', ' : '') + 'still open' : '') + (t.inferred ? (isDup || t.open ? ', ' : '') + 'SL/TP inferred' : '');
+      return '<tr class="' + (isDup ? 'dup' : '') + '"><td><input type="checkbox" data-imp="' + i + '"' + (isDup ? '' : ' checked') + (isDup ? ' disabled' : '') + '></td>' +
+        '<td>' + escHtml(t.date) + '</td><td>' + escHtml(t.symbol) + '</td><td>' + t.dir + '</td><td>' + fmt(t.qty, 4) + '</td><td>' + fmt(t.entry) + '</td><td>' + fmt(t.exit) + '</td>' +
+        '<td>' + fmt(t.sl) + '</td><td>' + fmt(t.tp) + '</td><td>' + (t.open ? '—' : fmt(t.gross, 4)) + '</td><td>' + fmt(t.fee, 4) + '</td><td>' + escHtml(flags) + '</td></tr>';
+    }).join('');
+    $('#tdd-import-table').innerHTML = '<table><thead><tr><th></th><th>date</th><th>symbol</th><th>side</th><th>qty</th><th>entry</th><th>exit</th><th>stop</th><th>target</th><th>gross P&amp;L</th><th>fees</th><th>notes</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    impMsg(importTradesList.length + ' trade' + (importTradesList.length === 1 ? '' : 's') + ' found in ' + importFileName + ' — ' + fresh + ' new' + (dup ? ', ' + dup + ' already in your journal (skipped)' : '') + '. Gross P&L and fees are in the file\'s own currency.');
+    $('#tdd-import-go').disabled = !fresh;
+  }
+  async function handleImportFile(file) {
+    importTradesList = []; $('#tdd-import-table').innerHTML = ''; $('#tdd-import-go').disabled = true;
+    if (!file) { impMsg(''); return; }
+    impMsg('Reading ' + file.name + '…');
+    try {
+      const matrix = await readImportFile(file);
+      const rec = TDDImport.toRecords(matrix);
+      if (rec.problem) { impMsg(rec.problem); return; }
+      importFileName = file.name;
+      importTradesList = TDDImport.buildTrades(rec.fills, rec.stops);
+      if (!importTradesList.length) { impMsg('No complete trades could be built from this file.'); return; }
+      renderImportPreview();
+    } catch (e) { impMsg('Could not read the file: ' + (e.message || e)); }
+  }
+  async function doImportTrades() {
+    if (!currentUser || !db) { openAuthModal(); return; }
+    const have = impKeys();
+    const picked = $$('#tdd-import-table input[data-imp]:checked').map(c => importTradesList[parseInt(c.dataset.imp)]).filter(t => t && !have.has(t.key));
+    if (!picked.length) { impMsg('Nothing selected.'); return; }
+    const capital = parseFloat($('#tdd-import-capital').value);
+    try { localStorage.setItem('tdd_import_capital', isNaN(capital) ? '' : String(capital)); } catch (e) {}
+    const btn = $('#tdd-import-go'); btn.disabled = true; impMsg('Saving ' + picked.length + ' trade(s)…');
+    try {
+      const ref = db.ref('positions/' + currentUser.uid), updates = {};
+      picked.forEach(t => { updates[ref.push().key] = TDDImport.toEntry(t, capital > 0 ? capital : 0, importFileName); });
+      await ref.update(updates);
+      impMsg('Imported ' + picked.length + ' trade(s). Open any of them from the journal to add the setup, checks, mistakes and Plan B.');
+      importTradesList = []; $('#tdd-import-table').innerHTML = ''; $('#tdd-import-file').value = '';
+    } catch (e) { impMsg('Could not save: ' + (e.message || e)); btn.disabled = false; }
+  }
+  $('#tdd-import-open').addEventListener('click', () => {
+    if (!currentUser) { openAuthModal(); return; }
+    impEl.style.display = 'block';
+    try { const c = localStorage.getItem('tdd_import_capital'); if (c && !$('#tdd-import-capital').value) $('#tdd-import-capital').value = c; } catch (e) {}
+  });
+  $('#tdd-import-close').addEventListener('click', () => { impEl.style.display = 'none'; });
+  $('#tdd-import-file').addEventListener('change', (ev) => handleImportFile(ev.target.files[0]));
+  $('#tdd-import-go').addEventListener('click', doImportTrades);
+  $('#tdd-filter-needs').addEventListener('change', renderJournal);
 
   function outcomeClass(o) {
     return o === 'win' ? 'o-win' : o === 'loss' ? 'o-loss' : o === 'liquidated' ? 'o-liq' : o === 'breakeven' ? 'o-win' : 'o-open';
@@ -2644,6 +3303,8 @@
   function parseNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isNaN(n) ? null : n; }
   // Fee cost of one round trip for a trade: { pct, r } or null when it can't be priced.
   function entryFee(e, points, result) {
+    const realFee = parseFloat(e.feePct); // imported trades carry their real fee (% of capital)
+    if (!isNaN(realFee)) { const rk = parseNum(e.risk) || 0; return { pct: realFee, r: rk > 0 ? realFee / rk : null }; }
     if (!(points > 0)) return { pct: 0, r: 0 };
     const risk = parseNum(e.risk) || 0;
     const entry = parseNum(e.entry), sl = parseNum(e.sl), lev = parseNum(e.leverage);
@@ -2687,7 +3348,7 @@
     box.innerHTML =
       '<div class="tdd-stat-row">' +
         stat(fmtPct(grossTotal), 'gross P&amp;L (before fees)', signClass(grossTotal)) +
-        stat('-' + feeTotal.toFixed(2) + '%', 'total fees (' + feePoints + ' pts / trade)', feeTotal > 0 ? 'tdd-pnl-neg' : '') +
+        stat('-' + feeTotal.toFixed(2) + '%', 'total fees (' + (rows.some(x => x.e.feePct != null) ? 'real fees where imported, ' : '') + feePoints + ' pts / trade otherwise)', feeTotal > 0 ? 'tdd-pnl-neg' : '') +
         stat(fmtPct(netTotal), 'net P&amp;L (after fees)', signClass(netTotal)) +
         stat(fmtPct(roi('net')), 'net ROI (compounded) · gross ' + fmtPct(roi('gross')), signClass(roi('net'))) +
       '</div>' +
@@ -2782,6 +3443,12 @@
     const label = t => t.e.symbol + ' ' + t.e.direction + ' (' + t.e.date + ')';
     const estCount = priced.filter(t => t.estimated).length;
 
+    const trendParts = ['with-trend', 'counter-trend'].map(tg => {
+      const xs = priced.filter(t => t.e.trendTag === tg); if (!xs.length) return null;
+      const w = xs.filter(t => t.cls === 'win').length, l = xs.filter(t => t.cls === 'loss').length;
+      return tg + ': ' + xs.length + ' trade' + (xs.length === 1 ? '' : 's') + ', win rate ' + (w + l ? Math.round(w / (w + l) * 100) + '%' : '—') + ', net ' + fmtPct(xs.reduce((a, t) => a + t.pct, 0));
+    }).filter(Boolean);
+    const trendStatsHtml = trendParts.length ? '<p class="tdd-pnl-note"><b>By trend relation (higher-timeframe bias at entry):</b> ' + trendParts.join(' · ') + '</p>' : '';
     const stat = (n, l, cls) => '<div class="tdd-stat"><div class="n ' + (cls || '') + '">' + n + '</div><div class="l">' + l + '</div></div>';
     box.innerHTML =
       '<div class="tdd-pnl-title">Performance — all closed trades</div>' +
@@ -2800,7 +3467,7 @@
       '<p class="tdd-pnl-note">Best: ' + label(best) + ' ' + fmtPct(best.pct) + ' · Worst: ' + label(worst) + ' ' + fmtPct(worst.pct) +
         ' · ' + open + ' open (not counted)' + (unpriced ? ' · ' + unpriced + ' win(s) skipped — no target/R:R or actual result' : '') + '</p>' +
       '<p class="tdd-pnl-note">' + estCount + ' of ' + priced.length + ' trade' + (priced.length === 1 ? ' is' : 's are') + ' estimated from your R:R and risk % (a win is assumed to hit its target, a loss to stop out at exactly -1R). ' +
-        'Enter an actual result on a trade to replace its estimate — especially liquidations, which can lose more than the risk % you set.</p>';
+        'Enter an actual result on a trade to replace its estimate — especially liquidations, which can lose more than the risk % you set.</p>' + trendStatsHtml;
   }
 
   function renderJournal() {
@@ -2815,15 +3482,19 @@
     }
     if (!entries.length) { el.innerHTML = '<div class="tdd-empty">No trades logged yet. Log your first one from "New trade / checklist".</div>'; return; }
     try {
-    el.innerHTML = entries.map(e => (
+    const shownEntries = ($('#tdd-filter-needs') && $('#tdd-filter-needs').checked) ? entries.filter(e => e.needsDetails) : entries;
+    if (!shownEntries.length) { el.innerHTML = '<div class="tdd-empty">No imported trades are waiting for details.</div>'; return; }
+    el.innerHTML = shownEntries.map(e => (
       '<div class="tdd-entry" data-id="' + e.id + '" style="cursor:pointer;" title="Click to edit this trade">' +
         '<div class="row1"><div><span class="who">' + e.symbol + ' — ' + e.direction + '</span> <span class="when">' + e.date + '</span></div>' +
-        '<div><span class="outcome ' + outcomeClass(e.outcome) + '">' + outcomeLabel(e.outcome) + (e.bigWin ? ' · BIG WIN' : '') + '</span></div></div>' +
-        '<div class="when" style="margin-top:6px;">setup: ' + e.setup + ' · risk ' + (e.risk||'—') + '% · leverage ' + (e.leverage||'—') + 'x · SL ' + (e.sl || 'NONE SET') + ' · target ' + (e.target || 'NONE SET') + (e.rr ? ' · R:R ' + e.rr : '') + '</div>' +
+        '<div><span class="outcome ' + outcomeClass(e.outcome) + '">' + outcomeLabel(e.outcome) + (e.bigWin ? ' · BIG WIN' : '') + '</span>' + (e.trendTag === 'with-trend' ? ' <span class="tdd-trend-pill with">WITH-TREND</span>' : e.trendTag === 'counter-trend' ? ' <span class="tdd-trend-pill counter">COUNTER-TREND</span>' : '') + (e.needsDetails ? ' <span class="tdd-needs-badge">IMPORTED — NEEDS DETAILS</span>' : '') + '</div></div>' +
+        '<div class="when" style="margin-top:6px;">setup: ' + (e.setup || 'not set') + ' · risk ' + (e.risk||'—') + '% · leverage ' + (e.leverage||'—') + 'x · SL ' + (e.sl || (e.needsDetails ? 'not set' : 'NONE SET')) + ' · target ' + (e.target || (e.needsDetails ? 'not set' : 'NONE SET')) + (e.rr ? ' · R:R ' + e.rr : '') + '</div>' +
         '<div class="when" style="margin-top:2px;">marked: ' + ((e.marksDrawn && e.marksDrawn.length) ? e.marksDrawn.join(', ') : 'nothing marked') + (e.retest && e.retest !== 'na' ? ' · confirmation: ' + retestLabel(e.retest) : '') + '</div>' +
         (e.rangeCheck || e.chartPattern || e.reversalTrendCheck ? '<div class="when" style="margin-top:2px;">' + (e.rangeCheck ? 'range check: ' + rangeCheckLabel(e.rangeCheck) : '') + (e.rangeCheck && (e.chartPattern || e.reversalTrendCheck) ? ' · ' : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' ? 'reversal trend: ' + reversalTrendCheckLabel(e.reversalTrendCheck) : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' && e.chartPattern ? ' · ' : '') + (e.chartPattern ? 'pattern: ' + chartPatternLabel(e.chartPattern) : '') + '</div>' : '') +
         (e.candleClosed === 'no' || e.goodLevel === 'no' ? '<div class="when" style="margin-top:2px; color:var(--rust);">' + (e.candleClosed === 'no' ? 'entered before candle closed' : '') + (e.candleClosed === 'no' && e.goodLevel === 'no' ? ' · ' : '') + (e.goodLevel === 'no' ? 'weak/unproven level' : '') + '</div>' : '') +
         (e.mistakes.length ? '<div class="tdd-pill-row">' + e.mistakes.map(m => '<span class="tdd-pill">' + m + '</span>').join('') + '</div>' : '') +
+        (e.locationFlag ? '<div class="when" style="margin-top:2px; color:var(--rust);">⚠ location flag at entry: ' + escHtml(e.locationFlag) + (e.locationReason ? ' — your reason: ' + escHtml(e.locationReason) : '') + '</div>' : '') +
+        (e.planB ? '<div class="note"><b>Plan B:</b> ' + escHtml(e.planB) + '</div>' : '') +
         (e.notes ? '<div class="note">' + e.notes + '</div>' : '') +
         (e.referenceImage ? '<div class="tdd-entry-ref"><img class="tdd-ref-zoom" src="' + e.referenceImage + '" alt="reference chart"></div>' : '') +
         '<button class="tdd-btn ghost small del" data-del="' + e.id + '">Delete</button>' +
@@ -2968,7 +3639,7 @@
     }
     const total = entries.length;
     const liq = entries.filter(e => e.outcome === 'liquidated').length;
-    const noSL = entries.filter(e => !e.sl).length;
+    const noSL = entries.filter(e => !e.sl && !e.needsDetails).length;
     const biasCount = entries.filter(e => e.bias === 'yes').length;
     statsEl.innerHTML =
       '<div class="tdd-stat"><div class="n">' + total + '</div><div class="l">trades logged</div></div>' +
@@ -3001,7 +3672,7 @@
     if (!entries.length) { liqNote.textContent = 'Log a few trades to see this.'; }
     else if (!liq) { liqNote.textContent = 'No liquidations logged yet — keep it that way.'; }
     else {
-      const liqNoSL = entries.filter(e => e.outcome === 'liquidated' && !e.sl).length;
+      const liqNoSL = entries.filter(e => e.outcome === 'liquidated' && !e.sl && !e.needsDetails).length;
       liqNote.textContent = 'Of ' + liq + ' liquidated trade(s), ' + liqNoSL + ' had no stop-loss set at entry. If that number equals ' + liq + ', the pattern is not the market — it is the missing stop-loss.';
     }
 
