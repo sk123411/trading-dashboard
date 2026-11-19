@@ -471,6 +471,24 @@
   </div>
 
   <!-- IMAGE LIGHTBOX -->
+  <div class="tdd-modal-backdrop hidden" id="tdd-pretrade">
+    <div class="tdd-modal" style="max-width:460px;" role="dialog" aria-modal="true" aria-labelledby="tdd-pretrade-title">
+      <h2 id="tdd-pretrade-title">Before a new trade — stop and look</h2>
+      <p class="sub" id="tdd-pretrade-streak" style="display:none; color:var(--rust);"></p>
+      <p class="sub" style="color:var(--text);">Open the chart and look at it <b>unbiased</b>, before you think about direction. Draw:</p>
+      <ul class="sub" style="margin:-8px 0 12px 18px; padding:0; color:var(--text);">
+        <li>Support and resistance</li>
+        <li>Trendlines</li>
+        <li>Discount and premium levels (the 50% of the latest swing range)</li>
+      </ul>
+      <p class="sub" style="color:var(--text);">You are an emotional trader. Without a system you are bound to lose, because feelings (revenge, hope, boredom, fear of missing out) choose the trade and the size. A system picks the location and the size for you.</p>
+      <p class="sub" style="color:var(--text-dim);">Heavy losses and oversized risk do not make you a bad trader; they show what happens without rules. One trade at a time, planned size, stop-loss set. Following the system is the win. Protecting your capital is how you stay in the game long enough to recover.</p>
+      <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+        <button class="tdd-btn ghost small" id="tdd-pretrade-cancel" type="button">Not now</button>
+        <button class="tdd-btn small" id="tdd-pretrade-ok" type="button">I have marked the chart — continue</button>
+      </div>
+    </div>
+  </div>
   <div class="tdd-modal-backdrop hidden" id="tdd-lightbox">
     <button class="tdd-modal-close" id="tdd-lightbox-close" style="position:fixed; top:20px; right:24px; font-size:30px; color:#fff; z-index:2;">&times;</button>
     <div id="tdd-lightbox-viewport" style="position:relative; width:92vw; height:92vh; overflow:hidden; display:flex; align-items:center; justify-content:center;">
@@ -1355,11 +1373,39 @@
     $('#panel-' + tab).classList.add('active');
     if (tab === 'livechart') ensureChartLoaded();
   }
+  // --- pre-trade reminder: shown once per browser session before a NEW trade (not when editing) ---
+  let pretradeSeen = false;
+  try { pretradeSeen = sessionStorage.getItem('tdd_pretrade_seen') === '1'; } catch (e) {}
+  function pretradeStreakText() {
+    const closed = (typeof entries !== 'undefined' ? entries : []).filter(e => e.outcome && e.outcome !== 'open' && !e.needsDetails)
+      .slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || String(b.id).localeCompare(String(a.id)));
+    let n = 0;
+    for (const e of closed) { if (e.outcome === 'loss' || e.outcome === 'liquidated') n++; else break; }
+    return n >= 2 ? 'Your last ' + n + ' closed trades were losses. Slow down: the next trade must come from the chart and the system, not from wanting the money back.' : '';
+  }
+  function withPretrade(proceed) {
+    if (pretradeSeen) { proceed(); return; }
+    const box = $('#tdd-pretrade'), st = $('#tdd-pretrade-streak'), msg = pretradeStreakText();
+    st.textContent = msg; st.style.display = msg ? 'block' : 'none';
+    const close = () => { box.classList.add('hidden'); $('#tdd-pretrade-ok').onclick = null; $('#tdd-pretrade-cancel').onclick = null; };
+    $('#tdd-pretrade-ok').onclick = () => {
+      pretradeSeen = true;
+      try { sessionStorage.setItem('tdd_pretrade_seen', '1'); } catch (e) {}
+      close(); proceed();
+    };
+    $('#tdd-pretrade-cancel').onclick = close;
+    box.classList.remove('hidden');
+  }
   $$('.tdd-navbtn').forEach(btn => btn.addEventListener('click', () => {
-    if (btn.dataset.tab === 'log' && editingId) resetForm();
-    goTab(btn.dataset.tab);
+    const go = () => {
+      if (btn.dataset.tab === 'log' && editingId) resetForm();
+      goTab(btn.dataset.tab);
+    };
+    if (btn.dataset.tab === 'log' && !editingId) withPretrade(go); else go();
   }));
-  $$('[data-goto]').forEach(btn => btn.addEventListener('click', () => goTab(btn.dataset.goto)));
+  $$('[data-goto]').forEach(btn => btn.addEventListener('click', () => {
+    if (btn.dataset.goto === 'log' && !editingId) withPretrade(() => goTab('log')); else goTab(btn.dataset.goto);
+  }));
 
   // --- TradingView live chart (embedded iframe — stays inside this page, no new tab) ---
   let tvSymbol = 'BINANCE:BTCUSDT';
