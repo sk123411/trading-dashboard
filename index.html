@@ -517,6 +517,7 @@
     <div class="tdd-navgroup-label">practice</div>
     <button class="tdd-navbtn" data-tab="log">New trade / checklist</button>
     <button class="tdd-navbtn" data-tab="journal">Journal history</button>
+    <button class="tdd-navbtn" data-tab="capital">Capital guard</button>
     <button class="tdd-navbtn" data-tab="fees">P&amp;L after fees</button>
     <button class="tdd-navbtn" data-tab="analytics">Analytics</button>
     <div class="tdd-sidebar-foot">streak: <span class="tdd-mono" id="tdd-streak-foot">0</span> days · trades: <span class="tdd-mono" id="tdd-count-foot">0</span></div>
@@ -1122,6 +1123,9 @@
         </div>
 
         <div class="tdd-field"><label>bias invalidation — the price that proves your higher-timeframe read wrong</label><input type="number" id="f-invalid" step="any" placeholder="type it before you enter"></div>
+        <div class="tdd-field"><label>size you will actually use (units, optional — blank = follow the suggested size)</label><input type="number" id="f-qty" min="0" step="any" placeholder="checked against your budget"></div>
+        <div class="tdd-field full" id="f-size-hint-row" style="display:none;"><div class="tdd-pnl-note" id="f-size-hint" style="margin:0; font-size:12.5px; line-height:1.6;"></div></div>
+        <div class="tdd-field full" id="f-budget-row" style="display:none;"><label style="color:var(--rust);">capital guard — why risk more than your budget on this trade? (required to save)</label><input type="text" id="f-budget-reason" placeholder="a real reason, or lower the risk"></div>
         <div class="tdd-field full" id="f-loc-row" style="display:none;"><label style="color:var(--rust);">location check — why take this trade here anyway? (required to save)</label><input type="text" id="f-loc-reason" maxlength="300" placeholder="e.g. 4H closed above the supply and retested it"></div>
         <div class="tdd-field"><label>trend relation (for your stats)</label><select id="f-trendtag"><option value="auto">auto — from the bias banner</option><option value="with-trend">with-trend</option><option value="counter-trend">counter-trend</option><option value="unknown">unknown</option></select></div>
         <div class="tdd-field full"><label>plan B — what will you do if this trade fails? (e.g. "stop trading until the next setup")</label><input type="text" id="f-planb" maxlength="300" placeholder="write it now, before you enter"></div>
@@ -1136,6 +1140,18 @@
         </div>
       </div>
 
+      <div class="tdd-plan" id="tdd-capbox" style="margin-bottom:12px;">
+        <div class="tdd-pnl-title">Capital</div>
+        <div id="tdd-capbox-stats" class="tdd-pnl-note" style="font-size:12.5px; line-height:1.7;"></div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+          <select id="capbox-type" style="padding:6px 8px; background:var(--bg-panel); border:1px solid var(--border); color:var(--text); border-radius:4px;"><option value="adjust">Trade result (+ win / − loss)</option><option value="deposit">Add money</option><option value="withdraw">Take money out</option></select>
+          <input type="number" id="capbox-amt" step="any" placeholder="amount in Rs" style="width:140px; padding:6px 8px; background:var(--bg-panel); border:1px solid var(--border); color:var(--text); border-radius:4px;">
+          <input type="text" id="capbox-note" placeholder="note (optional)" style="width:180px; padding:6px 8px; background:var(--bg-panel); border:1px solid var(--border); color:var(--text); border-radius:4px;">
+          <button class="tdd-btn small" id="capbox-apply" type="button">Apply</button>
+          <span class="tdd-pnl-note" id="capbox-status" style="margin:0;"></span>
+        </div>
+      </div>
+      <div class="tdd-verdict v-red" id="tdd-capital-lock" style="display:none;"></div>
       <div class="tdd-verdict v-green" id="tdd-verdict"></div>
 
       <div id="tdd-editing-banner" style="display:none; margin-bottom:10px; padding:10px 14px; border:1px solid var(--amber); border-radius:4px; color:var(--amber); font-size:13px;">Editing an existing trade — saving will update this entry instead of creating a new one.</div>
@@ -1172,6 +1188,40 @@
     </div>
 
     <!-- P&L AFTER FEES -->
+    <div class="tdd-panel" id="panel-capital">
+      <h1 class="tdd-h1">Capital guard</h1>
+      <p class="tdd-sub">Set this while you are calm. Your size comes from your profit, not from how you feel: a loss can only make the next trade smaller, never bigger. All values are amounts in your account currency.</p>
+      <div id="tdd-cap-summary" class="tdd-pnl-wrap"></div>
+      <div class="tdd-plan" style="margin-bottom:16px;">
+        <div class="tdd-pnl-title">Your limits</div>
+        <div class="tdd-form" id="tdd-cap-form">
+          <div class="tdd-field"><label>Rs per 1 USD (for USD-priced symbols like BTCUSDT — update it yourself)</label><input type="number" id="cap-fx" min="0" step="any" placeholder="e.g. your current rate"></div>
+          <div class="tdd-field"><label>share of your profit pool you may lose on one trade (%)</label><input type="number" id="cap-pct" min="0" step="any" placeholder="your own number — leave blank to use the budget below"></div>
+          <div class="tdd-field"><label>base budget — max loss per trade when the pool is empty</label><input type="number" id="cap-base" min="0" step="any" placeholder="small, fixed"></div>
+          <div class="tdd-field"><label>extra cap on max loss per trade (optional)</label><input type="number" id="cap-budget" min="0" step="any" placeholder="never more than this"></div>
+          <div class="tdd-field"><label>daily loss limit (money)</label><input type="number" id="cap-daily" min="0" step="any" placeholder="trading stops for the day when reached"></div>
+          <div class="tdd-field"><label>cooldown after a loss (minutes)</label><input type="number" id="cap-cool" min="0" step="1" placeholder="no new trade until it ends"></div>
+          <div class="tdd-field"><label>delay before a looser limit applies (hours)</label><input type="number" id="cap-delay" min="0" step="1" placeholder="0 = none"></div>
+          <div class="tdd-field"><label>units per contract (optional, e.g. 0.001)</label><input type="number" id="cap-unit" min="0" step="any" placeholder="to show size in contracts"></div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+          <button class="tdd-btn small" id="cap-save">Save</button>
+          <span class="tdd-pnl-note" id="cap-status" style="margin:0;"></span>
+        </div>
+        <p class="tdd-pnl-note" style="margin-top:8px;">Making a limit <b>tighter</b> (smaller budget, smaller daily limit, longer cooldown) applies at once. Making it <b>looser</b> is refused right after a loss, and otherwise only applies after the delay above. The profit pool comes from your capital ledger below (not from your trades): profit = the sum of the results you record, minus what you have withdrawn. Daily loss and cooldown also come from the ledger.</p>
+      </div>
+      <div class="tdd-plan" style="margin-bottom:16px;">
+        <div class="tdd-pnl-title">Capital analytics (from your ledger only)</div>
+        <div id="tdd-cap-analytics" class="tdd-pnl-wrap"></div>
+        <div id="tdd-cap-monthly"></div>
+      </div>
+      <div class="tdd-plan" style="margin-bottom:16px;">
+        <div class="tdd-pnl-title">Ledger — latest entries</div>
+        <div id="tdd-cap-ledger"></div>
+        <p class="tdd-pnl-note" style="margin-top:8px;">Add entries from the Capital box on the New trade tab. Entries are permanent so the history cannot be rewritten; fix a mistake with a correcting entry.</p>
+      </div>
+    </div>
+
     <div class="tdd-panel" id="panel-fees">
       <h1 class="tdd-h1">P&amp;L after fees</h1>
       <p class="tdd-sub">Same closed trades as Journal history, with trading costs taken off. Costs are modelled as a break-even move: price has to travel this many points in your favour just to pay the round-trip fees.</p>
@@ -2130,6 +2180,7 @@
   let refImageDataUrl = null;
   let streakRef = null;
   let editingId = null;
+  let capitalCfg = null, capitalRef = null, ledger = [], ledgerRef = null;
 
   function computeStreakFromDates(dateKeys) {
     const set = new Set(dateKeys);
@@ -2288,6 +2339,8 @@
       if (user) {
         attachPositionsListener(user.uid);
         attachStreakListener(user.uid);
+        attachCapitalListener(user.uid);
+        attachLedgerListener(user.uid);
         closeAuthModal();
         if (pendingSaveAfterAuth) { pendingSaveAfterAuth = false; doSaveEntry(); }
         if (pendingPlaybookSyncAfterAuth) { pendingPlaybookSyncAfterAuth = false; doSyncPlaybook(); }
@@ -2298,6 +2351,8 @@
       } else {
         detachPositionsListener();
         detachStreakListener();
+        detachCapitalListener();
+        detachLedgerListener();
         friendLoadSeq++;
         clearPlan();
         clearCustomStrategies();
@@ -2598,7 +2653,7 @@
       const res = await fetch(TRADING_FRIEND_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: idToken, message: text, history: friendHistory.slice(-12), symbol: tvSymbol, analysis: analysis, preferredProvider: preferredProvider })
+        body: JSON.stringify({ idToken: idToken, message: text, history: friendHistory.slice(-12), symbol: tvSymbol, analysis: analysis, preferredProvider: preferredProvider, capital: capitalForChat() })
       });
       let data = {};
       try { data = await res.json(); } catch (e) {}
@@ -2678,7 +2733,7 @@
     try {
       const idToken = await currentUser.getIdToken();
       const res = await fetch(TRADING_FRIEND_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: idToken, message: question, symbol: tvSymbol, analysis: friendAnalysisOpts(), promptOnly: true }) });
+        body: JSON.stringify({ idToken: idToken, message: question, symbol: tvSymbol, analysis: friendAnalysisOpts(), promptOnly: true, capital: capitalForChat() }) });
       let data = {}; try { data = await res.json(); } catch (e) {}
       if (!res.ok || data.error || !data.prompt) { appendFriendMsg('error', data.error || (res.ok ? 'The Worker did not return a prompt — deploy the latest Worker (src/index.js).' : 'Request failed (HTTP ' + res.status + ').')); return; }
       $('#tdd-copybox-text').value = data.prompt;
@@ -2807,6 +2862,217 @@
     rrField.value = '1 : ' + rr.toFixed(2);
   }
 
+  // --- capital guard: your own ledger (deposits, withdrawals, signed trade results) -> profit pool -> budget for the next trade ---
+  // Everything is in your own currency and typed by you. Journal trades are never used to work out money.
+  const CAP_LOOSEN = { poolPct: 'up', budget: 'up', baseBudget: 'up', dailyLimit: 'up', cooldownMin: 'down' }; // direction that makes a limit looser
+  function capNum(v) { const n = parseFloat(v); return isNaN(n) ? null : n; }
+  function capLocalDay(ms) { const d = new Date(ms == null ? Date.now() : ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function capEffectiveCfg(c) {
+    if (!c) return null;
+    const out = Object.assign({}, c), p = c.pending;
+    if (p && p.at && Date.now() >= p.at + (capNum(c.delayHours) || 0) * 3600000) Object.keys(CAP_LOOSEN).forEach(k => { if (p[k] != null) out[k] = p[k]; });
+    return out;
+  }
+  function capitalState() {
+    const c = capEffectiveCfg(capitalCfg) || {};
+    const hasLedger = ledger.length > 0;
+    if (!hasLedger && !(capNum(c.budget) > 0 || capNum(c.baseBudget) > 0 || capNum(c.poolPct) > 0)) return null;
+    const now = Date.now(), today = capLocalDay(), delayMs = (capNum(c.delayHours) || 0) * 3600000;
+    let deposited = 0, withdrawn = 0, profit = 0, profitAll = 0, pendingWin = 0, todayNet = 0, lastNegTs = 0, lastAdj = null;
+    ledger.forEach(e => {
+      const amt = capNum(e.amount) || 0;
+      if (e.type === 'deposit') deposited += amt;
+      else if (e.type === 'withdraw') withdrawn += amt;
+      else if (e.type === 'adjust') {
+        profitAll += amt;
+        const effective = amt <= 0 || now >= (e.ts || 0) + delayMs; // a win only counts after your delay; a loss counts at once
+        if (effective) { profit += amt; if (e.day === today) todayNet += amt; } else pendingWin += amt;
+        if (amt < 0 && e.day === today) lastNegTs = Math.max(lastNegTs, e.ts || 0);
+        if (!lastAdj || (e.ts || 0) >= (lastAdj.ts || 0)) lastAdj = e;
+      }
+    });
+    const balance = deposited + profit - withdrawn;
+    const pool = Math.max(0, profit - withdrawn);
+    const pct = capNum(c.poolPct), chosen = capNum(c.budget), base = capNum(c.baseBudget) || 0;
+    let budget;
+    if (pool > 0) {
+      const caps = [pool]; if (pct > 0) caps.push(pool * pct / 100); if (chosen > 0) caps.push(chosen);
+      budget = Math.min.apply(null, caps);
+    } else budget = base;
+    if (hasLedger) budget = balance > 0 ? Math.min(budget, balance) : 0;
+    const limit = capNum(c.dailyLimit) || 0;
+    const limitHit = limit > 0 && todayNet <= -limit;
+    const cdMs = (capNum(c.cooldownMin) || 0) * 60000;
+    const cdLeft = lastNegTs && cdMs ? Math.max(0, lastNegTs + cdMs - now) : 0;
+    return { hasLedger, deposited, withdrawn, profit, profitAll, pendingWin, balance, pool, poolEmpty: !(pool > 0), budget, todayNet, limit, limitHit, dailyLeft: limit > 0 ? Math.max(0, limit + todayNet) : null, cdLeft, lastAdjNeg: !!lastAdj && (capNum(lastAdj.amount) || 0) < 0, noCapital: hasLedger && !(balance > 0), unit: capNum(c.unitSize), fx: capNum(c.fx) };
+  }
+  function capMoney(n) { return (Math.round(n * 100) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+  function capLockMessage(st) {
+    if (!st) return '';
+    if (st.noCapital) return 'NO CAPITAL LEFT in your ledger (balance ' + capMoney(st.balance) + '). There is nothing to trade with. Adding money is a decision to make away from the screen, not in the middle of a bad day.';
+    if (st.limitHit) return 'DAILY LOSS LIMIT REACHED — today\'s net result is ' + capMoney(st.todayNet) + ' against a limit of ' + capMoney(st.limit) + '. No new trade can be saved today. Close the chart; the next trade is tomorrow\'s.';
+    if (st.cdLeft > 0) return 'COOLDOWN after a loss — ' + Math.ceil(st.cdLeft / 60000) + ' minute(s) left. No new trade can be saved until it ends. The urge to win it back is the trade you are about to regret.';
+    return '';
+  }
+  // price -> your currency: USD-priced symbols need your Rs-per-USD rate (only used for the size shown on the form); NSE/BSE are already in Rs
+  function capRate(symbol, st) {
+    const sym = String(symbol || '').toUpperCase();
+    if (/^(NSE|BSE):/.test(sym)) return { rate: 1 };
+    if (/USD[TC]?$|BUSD$|PERP$/.test(sym)) return st.fx > 0 ? { rate: st.fx } : { rate: null };
+    return { rate: 1, assumed: true };
+  }
+  function capitalCheck() {
+    const res = { reds: [], ambers: [], hint: '', breach: false, lock: '' };
+    if (editingId || $('#f-outcome').value !== 'open') return res;
+    const st = capitalState();
+    if (!st) { res.ambers.push('Capital guard is not set up — open the Capital guard tab, set your limits, and add your starting capital in the Capital box above.'); return res; }
+    res.lock = capLockMessage(st);
+    const entry = parseFloat($('#f-entry').value), sl = parseFloat($('#f-sl').value), lev = parseFloat($('#f-leverage').value) || 1, qty = parseFloat($('#f-qty').value);
+    const cr = capRate($('#f-symbol').value, st);
+    let hint = 'Max loss for this trade: <b>' + capMoney(st.budget) + '</b>' + (st.poolEmpty ? ' (no profit pool — base budget)' : ' (from your profit pool of ' + capMoney(st.pool) + ')') + '.';
+    if (!isNaN(entry) && !isNaN(sl) && entry !== sl && entry > 0 && st.budget > 0) {
+      if (cr.rate == null) hint += ' <b>Enter "Rs per 1 USD" in the Capital guard tab to see the size for this USD-priced symbol.</b>';
+      else {
+        const lossPerUnit = Math.abs(entry - sl) * cr.rate, units = st.budget / lossPerUnit, value = units * entry * cr.rate, margin = value / lev;
+        hint += ' Position size: <b>' + (Math.round(units * 1e6) / 1e6) + ' units</b>' + (st.unit > 0 ? ' (about ' + Math.floor(units / st.unit) + ' contracts)' : '') +
+          '. Position value ' + capMoney(value) + (lev > 1 ? ', so the capital to put in (margin) at ' + lev + 'x is <b>' + capMoney(margin) + '</b>' : ' — put in <b>' + capMoney(value) + '</b> (no leverage)') + '. If the stop-loss hits you lose about ' + capMoney(st.budget) + '.' + (cr.assumed ? ' (Assuming the price is already in your currency.)' : '');
+        if (qty > 0 && qty * lossPerUnit > st.budget * (1 + 1e-9)) {
+          res.breach = true;
+          res.reds.push('Capital guard: ' + qty + ' units would lose ' + capMoney(qty * lossPerUnit) + ' at your stop-loss, above your budget of ' + capMoney(st.budget) + '. Use at most ' + (Math.round(units * 1e6) / 1e6) + ' units — oversized positions are what wipe accounts out.');
+        }
+        if (st.hasLedger && margin > st.balance) res.reds.push('Capital guard: the margin for this trade (' + capMoney(margin) + ') is more than the capital you have left (' + capMoney(st.balance) + ').');
+      }
+    }
+    if (st.dailyLeft != null) hint += ' Daily loss left: ' + capMoney(st.dailyLeft) + '.';
+    res.hint = hint;
+    if (lev > 1 && !isNaN(entry) && !isNaN(sl) && entry > 0 && Math.abs(entry - sl) >= entry / lev) res.reds.push('Capital guard: at ' + lev + 'x leverage the liquidation price is roughly ' + (Math.round(entry / lev * 100) / 100) + ' points from entry (approximate — your exchange adds fees and maintenance margin), which is not beyond your stop-loss distance. You would be liquidated before the stop-loss fires.');
+    return res;
+  }
+  function renderCapitalLockBanner() {
+    const box = $('#tdd-capital-lock'); if (!box) return;
+    const live = !editingId && $('#f-outcome').value === 'open';
+    const msg = live ? capLockMessage(capitalState()) : '';
+    box.style.display = msg ? 'block' : 'none';
+    box.innerHTML = msg ? '<span class="lead">Trading locked</span>' + escHtml(msg) : '';
+  }
+  function renderCapbox() {
+    const box = $('#tdd-capbox-stats'); if (!box) return;
+    const st = capitalState();
+    if (!st || !st.hasLedger) { box.innerHTML = 'No capital recorded yet. Choose "Add money", enter what you deploy to your trading account, and press Apply.'; return; }
+    box.innerHTML = 'Deployed: <b>' + capMoney(st.deposited) + '</b> · Withdrawn: <b>' + capMoney(st.withdrawn) + '</b> · Balance: <b>' + capMoney(st.balance) + '</b> · Profit pool: <b>' + capMoney(st.pool) + '</b> · Max loss on the next trade: <b>' + capMoney(st.budget) + '</b> · Today: <b>' + capMoney(st.todayNet) + '</b>' + (st.pendingWin ? ' · waiting for your delay: +' + capMoney(st.pendingWin) : '');
+  }
+  function renderCapitalPanel() {
+    const box = $('#tdd-cap-summary'); if (!box) return;
+    const st = capitalState();
+    if (!st) { box.innerHTML = '<p class="tdd-pnl-note">Not set up yet. Add your starting capital in the Capital box on the New trade tab, then fill in your limits below.</p>'; }
+    else {
+      const stat = (n, l, cls) => '<div class="tdd-stat"><div class="n ' + (cls || '') + '">' + n + '</div><div class="l">' + l + '</div></div>';
+      box.innerHTML = '<div class="tdd-stat-row">' +
+        stat(capMoney(st.budget), 'max loss on your next trade' + (st.poolEmpty ? ' (base budget)' : '')) +
+        stat(capMoney(st.pool), 'profit pool', st.pool > 0 ? 'tdd-pnl-pos' : '') +
+        stat(capMoney(st.todayNet), "today's net result" + (st.limit > 0 ? ' (limit −' + capMoney(st.limit) + ')' : ''), st.todayNet < 0 ? 'tdd-pnl-neg' : st.todayNet > 0 ? 'tdd-pnl-pos' : '') +
+        stat(st.noCapital || st.limitHit ? 'LOCKED' : st.cdLeft > 0 ? Math.ceil(st.cdLeft / 60000) + ' min' : 'clear', 'trading status', st.noCapital || st.limitHit || st.cdLeft > 0 ? 'tdd-pnl-neg' : 'tdd-pnl-pos') + '</div>';
+      const pend = capitalCfg && capitalCfg.pending && capitalCfg.pending.at ? capitalCfg.pending : null;
+      if (pend && Date.now() < pend.at + (capNum(capitalCfg.delayHours) || 0) * 3600000) box.innerHTML += '<p class="tdd-pnl-note">A looser limit you asked for is waiting and applies at ' + escHtml(new Date(pend.at + (capNum(capitalCfg.delayHours) || 0) * 3600000).toLocaleString()) + '.</p>';
+    }
+    // analytics
+    const an = $('#tdd-cap-analytics'), mo = $('#tdd-cap-monthly'), lg = $('#tdd-cap-ledger');
+    if (!st || !st.hasLedger) { if (an) an.innerHTML = '<p class="tdd-pnl-note">No ledger entries yet.</p>'; if (mo) mo.innerHTML = ''; if (lg) lg.innerHTML = ''; return; }
+    const stat2 = (n, l, cls) => '<div class="tdd-stat"><div class="n ' + (cls || '') + '">' + n + '</div><div class="l">' + l + '</div></div>';
+    const ret = st.deposited > 0 ? (Math.round(st.profitAll / st.deposited * 1e4) / 100) : 0;
+    an.innerHTML = '<div class="tdd-stat-row">' +
+      stat2(capMoney(st.deposited), 'total capital deployed') + stat2(capMoney(st.withdrawn), 'total withdrawn') +
+      stat2((st.profitAll >= 0 ? '+' : '') + capMoney(st.profitAll), 'profit / loss (sum of results)', st.profitAll > 0 ? 'tdd-pnl-pos' : st.profitAll < 0 ? 'tdd-pnl-neg' : '') +
+      stat2(capMoney(st.balance), 'balance now') + '</div>' +
+      '<div class="tdd-stat-row">' + stat2((ret >= 0 ? '+' : '') + ret + '%', 'return on capital deployed', ret > 0 ? 'tdd-pnl-pos' : ret < 0 ? 'tdd-pnl-neg' : '') +
+      stat2(capMoney(st.pool), 'profit pool (profit not yet withdrawn)') +
+      stat2(st.profitAll > 0 ? (Math.round(Math.min(st.withdrawn, st.profitAll) / st.profitAll * 1e3) / 10) + '%' : '—', 'of your profit already withdrawn') +
+      stat2(st.withdrawn > Math.max(0, st.profitAll) ? 'yes' : 'no', 'withdrawn more than profit (eating capital)', st.withdrawn > Math.max(0, st.profitAll) ? 'tdd-pnl-neg' : '') + '</div>';
+    const months = {};
+    ledger.forEach(e => { const m = String(e.day || capLocalDay(e.ts)).slice(0, 7); const r = months[m] || (months[m] = { dep: 0, wd: 0, res: 0, n: 0 }); const a = capNum(e.amount) || 0; if (e.type === 'deposit') r.dep += a; else if (e.type === 'withdraw') r.wd += a; else r.res += a; r.n++; });
+    mo.innerHTML = '<table class="tdd-fee-table"><tr><th style="text-align:left">month</th><th>deployed</th><th>withdrawn</th><th>result</th><th>entries</th></tr>' +
+      Object.keys(months).sort().reverse().map(m => '<tr><td>' + escHtml(m) + '</td><td>' + capMoney(months[m].dep) + '</td><td>' + capMoney(months[m].wd) + '</td><td class="' + (months[m].res > 0 ? 'tdd-pnl-pos' : months[m].res < 0 ? 'tdd-pnl-neg' : '') + '">' + (months[m].res > 0 ? '+' : '') + capMoney(months[m].res) + '</td><td>' + months[m].n + '</td></tr>').join('') + '</table>';
+    const label = { deposit: 'added money', withdraw: 'took money out', adjust: 'trade result' };
+    lg.innerHTML = '<table class="tdd-fee-table"><tr><th style="text-align:left">when</th><th style="text-align:left">type</th><th>amount</th><th style="text-align:left">note</th></tr>' +
+      ledger.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 20).map(e => '<tr><td>' + escHtml(e.day || '') + '</td><td style="text-align:left">' + escHtml(label[e.type] || e.type) + '</td><td>' + (e.type === 'adjust' && e.amount > 0 ? '+' : '') + capMoney(capNum(e.amount) || 0) + '</td><td style="text-align:left">' + escHtml(e.note || '') + '</td></tr>').join('') + '</table>';
+  }
+  function fillCapitalForm() {
+    const c = capEffectiveCfg(capitalCfg) || {};
+    const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = (v == null ? '' : v); };
+    set('#cap-fx', c.fx); set('#cap-pct', c.poolPct); set('#cap-base', c.baseBudget); set('#cap-budget', c.budget);
+    set('#cap-daily', c.dailyLimit); set('#cap-cool', c.cooldownMin); set('#cap-delay', c.delayHours); set('#cap-unit', c.unitSize);
+  }
+  function capitalForChat() {
+    const st = capitalState(); if (!st) return null;
+    return { budget: st.budget, dailyLeft: st.dailyLeft, cooldownMinLeft: st.cdLeft > 0 ? Math.ceil(st.cdLeft / 60000) : 0 };
+  }
+  function refreshCapitalUI() { fillCapitalForm(); renderCapitalPanel(); renderCapbox(); renderCapitalLockBanner(); computeVerdict(); }
+  function attachCapitalListener(uid) {
+    if (!db) return;
+    capitalRef = db.ref('capital/' + uid);
+    capitalRef.on('value', snap => { capitalCfg = snap.val(); refreshCapitalUI(); }, err => { const s = $('#cap-status'); if (s) s.textContent = 'Could not read capital settings — add the Firebase rule for "capital".'; });
+  }
+  function detachCapitalListener() { if (capitalRef) capitalRef.off(); capitalRef = null; capitalCfg = null; refreshCapitalUI(); }
+  function attachLedgerListener(uid) {
+    if (!db) return;
+    ledgerRef = db.ref('ledger/' + uid);
+    ledgerRef.on('value', snap => {
+      const v = snap.val() || {};
+      ledger = Object.keys(v).map(k => Object.assign({ id: k }, v[k])).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+      refreshCapitalUI();
+    }, err => { const s = $('#capbox-status'); if (s) s.textContent = 'Could not read the ledger — add the Firebase rule for "ledger".'; });
+  }
+  function detachLedgerListener() { if (ledgerRef) ledgerRef.off(); ledgerRef = null; ledger = []; refreshCapitalUI(); }
+  async function applyLedgerEntry() {
+    const status = $('#capbox-status');
+    if (!currentUser || !db) { status.textContent = 'Sign in first.'; return; }
+    const type = $('#capbox-type').value, amt = capNum($('#capbox-amt').value), note = $('#capbox-note').value.trim().slice(0, 200);
+    if (amt == null || amt === 0) { status.textContent = 'Enter an amount.'; return; }
+    if ((type === 'deposit' || type === 'withdraw') && amt < 0) { status.textContent = 'Use a positive amount for ' + (type === 'deposit' ? 'adding' : 'taking out') + ' money.'; return; }
+    const st = capitalState();
+    if (type === 'withdraw' && st && amt > st.balance) { status.textContent = 'You cannot take out more than your balance (' + capMoney(st.balance) + ').'; return; }
+    try {
+      await ledgerRef.push({ ts: Date.now(), day: capLocalDay(), type: type, amount: amt, note: note });
+      $('#capbox-amt').value = ''; $('#capbox-note').value = '';
+      const delay = capNum((capEffectiveCfg(capitalCfg) || {}).delayHours) || 0;
+      status.textContent = (type === 'adjust' && amt > 0 && delay > 0) ? 'Saved. A win counts toward your pool after the ' + delay + ' hour delay.' : 'Saved.';
+    } catch (e) { status.textContent = 'Could not save: ' + (e.message || e) + ' (add the Firebase rule for "ledger").'; }
+  }
+  $('#capbox-apply').addEventListener('click', applyLedgerEntry);
+  async function saveCapital() {
+    const status = $('#cap-status');
+    if (!currentUser || !db) { status.textContent = 'Sign in first.'; return; }
+    const v = id => capNum($(id).value);
+    const next = { fx: v('#cap-fx'), poolPct: v('#cap-pct'), baseBudget: v('#cap-base'), budget: v('#cap-budget'), dailyLimit: v('#cap-daily'), cooldownMin: v('#cap-cool'), delayHours: v('#cap-delay'), unitSize: v('#cap-unit') };
+    if (!(next.budget > 0 || next.baseBudget > 0 || next.poolPct > 0)) { status.textContent = 'Enter at least a base budget, a percent of the pool, or a budget cap.'; return; }
+    const bad = Object.keys(next).find(k => next[k] != null && next[k] < 0);
+    if (bad) { status.textContent = 'Values cannot be negative.'; return; }
+    const cur = capEffectiveCfg(capitalCfg) || {};
+    const st = capitalState();
+    const store = Object.assign({}, next);
+    const pending = Object.assign({}, (capitalCfg && capitalCfg.pending && capitalCfg.pending.at) ? capitalCfg.pending : {});
+    let loosened = [];
+    const cleared = Object.keys(CAP_LOOSEN).find(k => CAP_LOOSEN[k] === 'up' && capNum(cur[k]) != null && next[k] == null && capitalCfg);
+    if (cleared) { status.textContent = 'Not saved: "' + cleared + '" cannot be cleared (that would remove the limit). Type a smaller value, or a larger one to loosen it after the delay.'; return; }
+    Object.keys(CAP_LOOSEN).forEach(k => {
+      const was = capNum(cur[k]), now = next[k];
+      const looser = !!capitalCfg && (CAP_LOOSEN[k] === 'up' ? (was != null && now != null && now > was) : ((now || 0) < (was || 0)));
+      if (looser) { loosened.push(k); store[k] = was; pending[k] = now || 0; }
+      else if (pending[k] != null && now !== was) delete pending[k];
+      else if (pending[k] != null) store[k] = was;
+    });
+    if (loosened.length && st && st.lastAdjNeg) { status.textContent = 'Not saved: your last recorded result was a loss, so you cannot loosen a limit now (' + loosened.join(', ') + '). Make it tighter, or wait until after a win.'; return; }
+    if (loosened.length) pending.at = Date.now();
+    store.pending = Object.keys(pending).filter(k => k !== 'at').length ? pending : null;
+    store.updatedAt = Date.now();
+    try {
+      await capitalRef.set(store);
+      status.textContent = loosened.length ? 'Saved. Tighter changes apply now; ' + loosened.join(', ') + ' will loosen after the ' + (next.delayHours || 0) + ' hour delay.' : 'Saved.';
+    } catch (e) { status.textContent = 'Could not save: ' + (e.message || e); }
+  }
+  $('#cap-save').addEventListener('click', saveCapital);
+  setInterval(() => { renderCapitalLockBanner(); renderCapbox(); if ($('#panel-capital').classList.contains('active')) renderCapitalPanel(); }, 20000);
+
   function computeVerdict() {
     const sl = $('#f-sl').value;
     const target = $('#f-target').value;
@@ -2858,6 +3124,11 @@
       const loc = currentLocationCheck();
       loc.reds.forEach(x => reds.push(x)); loc.ambers.forEach(x => ambers.push(x));
       const lr = $('#f-loc-row'); if (lr) lr.style.display = loc.reds.length ? 'block' : 'none';
+      const cap = capitalCheck();
+      cap.reds.forEach(x => reds.push(x)); cap.ambers.forEach(x => ambers.push(x));
+      const br = $('#f-budget-row'); if (br) br.style.display = cap.breach ? 'block' : 'none';
+      const hr = $('#f-size-hint-row'); if (hr) { hr.style.display = cap.hint ? 'block' : 'none'; $('#f-size-hint').innerHTML = cap.hint; }
+      renderCapitalLockBanner();
       if (!$('#f-invalid').value.trim()) ambers.push("No bias-invalidation level. Type the price at which your read of the higher timeframe is wrong — if you can't name it, you're trading on a feeling.");
     }
     if (!setup) ambers.push("No playbook setup selected — this is the forced-trade pattern that's cost you the most.");
@@ -2877,7 +3148,7 @@
       v.innerHTML = '<span class="lead">Structure, risk and stop-loss are in place</span>This still isn\'t a guarantee — it just means you\'re not defeating yourself before the trade even starts.';
     }
   }
-  ['#f-loc-reason','#f-invalid','#f-planb','#f-sl','#f-risk','#f-leverage','#f-setup','#f-retest','#f-target','#f-entry','#f-range-check','#f-chart-pattern','#f-reversal-trend-check'].forEach(sel => $(sel).addEventListener('input', () => { computeRR(); computeVerdict(); }));
+  ['#f-qty','#f-budget-reason','#f-loc-reason','#f-invalid','#f-planb','#f-sl','#f-risk','#f-leverage','#f-setup','#f-retest','#f-target','#f-entry','#f-range-check','#f-chart-pattern','#f-reversal-trend-check'].forEach(sel => $(sel).addEventListener('input', () => { computeRR(); computeVerdict(); }));
   $('#f-symbol').addEventListener('change', ensureFormBias);
   $('#f-direction').addEventListener('change', () => { updateInvalidPlaceholder(); computeVerdict(); });
   $('#f-outcome').addEventListener('change', computeVerdict);
@@ -2933,6 +3204,8 @@
       if (!editingId && bb) { entry.biasDaily = bb.daily ? bb.daily.status : ''; entry.biasWeekly = bb.weekly ? bb.weekly.status : ''; }
     }
     if (!editingId && $('#f-outcome').value === 'open') {
+      const cg = capitalCheck();
+      if (cg.breach) { entry.budgetFlag = cg.reds[0].replace(/^Capital guard: /, '').slice(0, 300); entry.budgetReason = $('#f-budget-reason').value.trim(); }
       const lc = currentLocationCheck();
       if (lc.reds.length) { entry.locationFlag = lc.reds.map(x => x.replace(/^Location: /, '')).join(' | ').slice(0, 400); entry.locationReason = $('#f-loc-reason').value.trim(); }
     }
@@ -2950,13 +3223,13 @@
     editingId = null;
     $('#tdd-import-edit-note').style.display = 'none';
     $('#f-date').value = new Date().toISOString().slice(0,10);
-    $('#f-symbol').value=''; $('#f-entry').value=''; $('#f-sl').value=''; $('#f-target').value=''; $('#f-rr').value=''; $('#f-notes').value=''; $('#f-planb').value=''; $('#f-invalid').value=''; $('#f-trendtag').value='auto'; $('#f-loc-reason').value='';
+    $('#f-symbol').value=''; $('#f-entry').value=''; $('#f-sl').value=''; $('#f-target').value=''; $('#f-rr').value=''; $('#f-notes').value=''; $('#f-planb').value=''; $('#f-invalid').value=''; $('#f-trendtag').value='auto'; $('#f-loc-reason').value=''; $('#f-budget-reason').value='';
     $('#f-direction').value = 'Long';
     $('#f-htf').value = 'up';
     $('#f-leverage').value = '1';
     $('#f-risk').value = '1';
     $('#f-outcome').value = 'open';
-    $('#f-pnl').value = '';
+    $('#f-pnl').value = ''; $('#f-qty').value = '';
     $$('#tdd-mistake-checks input').forEach(c => c.checked = false);
     $('#f-mark-support').checked = false;
     $('#f-mark-resistance').checked = false;
@@ -3036,6 +3309,16 @@
 
   async function doSaveEntry() {
     if (!currentUser || !db) return;
+    if (!editingId && $('#f-outcome').value === 'open') {
+      const lockMsg = capLockMessage(capitalState());
+      if (lockMsg) { alert('Cannot save a new trade.\n\n' + lockMsg); return; }
+      const capGate = capitalCheck();
+      if (capGate.breach && !$('#f-budget-reason').value.trim()) {
+        $('#f-budget-row').style.display = 'block'; $('#f-budget-reason').focus();
+        alert('Stop — this trade risks more than your budget:\n\n• ' + capGate.reds.join('\n• ') + '\n\nLower the risk, or write why you are breaking your own budget (the box is highlighted above the location check).');
+        return;
+      }
+    }
     const locGate = currentLocationCheck();
     if (locGate.reds.length && !$('#f-loc-reason').value.trim()) {
       $('#f-loc-row').style.display = 'block'; $('#f-loc-reason').focus();
@@ -3539,7 +3822,7 @@
         (e.rangeCheck || e.chartPattern || e.reversalTrendCheck ? '<div class="when" style="margin-top:2px;">' + (e.rangeCheck ? 'range check: ' + rangeCheckLabel(e.rangeCheck) : '') + (e.rangeCheck && (e.chartPattern || e.reversalTrendCheck) ? ' · ' : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' ? 'reversal trend: ' + reversalTrendCheckLabel(e.reversalTrendCheck) : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' && e.chartPattern ? ' · ' : '') + (e.chartPattern ? 'pattern: ' + chartPatternLabel(e.chartPattern) : '') + '</div>' : '') +
         (e.candleClosed === 'no' || e.goodLevel === 'no' ? '<div class="when" style="margin-top:2px; color:var(--rust);">' + (e.candleClosed === 'no' ? 'entered before candle closed' : '') + (e.candleClosed === 'no' && e.goodLevel === 'no' ? ' · ' : '') + (e.goodLevel === 'no' ? 'weak/unproven level' : '') + '</div>' : '') +
         (e.mistakes.length ? '<div class="tdd-pill-row">' + e.mistakes.map(m => '<span class="tdd-pill">' + m + '</span>').join('') + '</div>' : '') +
-        (e.locationFlag ? '<div class="when" style="margin-top:2px; color:var(--rust);">⚠ location flag at entry: ' + escHtml(e.locationFlag) + (e.locationReason ? ' — your reason: ' + escHtml(e.locationReason) : '') + '</div>' : '') +
+        (e.budgetFlag ? '<div class="when" style="margin-top:2px; color:var(--rust);">⚠ over budget at entry: ' + escHtml(e.budgetFlag) + (e.budgetReason ? ' — your reason: ' + escHtml(e.budgetReason) : '') + '</div>' : '') + (e.locationFlag ? '<div class="when" style="margin-top:2px; color:var(--rust);">⚠ location flag at entry: ' + escHtml(e.locationFlag) + (e.locationReason ? ' — your reason: ' + escHtml(e.locationReason) : '') + '</div>' : '') +
         (e.planB ? '<div class="note"><b>Plan B:</b> ' + escHtml(e.planB) + '</div>' : '') +
         (e.notes ? '<div class="note">' + e.notes + '</div>' : '') +
         (e.referenceImage ? '<div class="tdd-entry-ref"><img class="tdd-ref-zoom" src="' + e.referenceImage + '" alt="reference chart"></div>' : '') +
