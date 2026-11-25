@@ -918,6 +918,7 @@
           <label title="Off = previous behaviour. On = code computes entry zone, stop, targets and R:R for long and short; the AI must quote them. Every trade it suggests is saved to the Suggested trades list below."><input type="checkbox" id="tdd-friend-opt-trademap"> Trade map</label>
           <label title="Off = previous behaviour. On = counts how often the nearest support/resistance was tested and whether the bounces are shrinking (a weakening warning)."><input type="checkbox" id="tdd-friend-opt-weaksr"> Weakening S/R</label>
           <label title="Off = previous behaviour. On = adds Fibonacci retracement zone (0.5–0.705) and extensions (1.272, 1.618) of the latest swing leg; also checked against the trade map entry."><input type="checkbox" id="tdd-friend-opt-fib"> Fibonacci</label>
+          <label title="On by default. The AI may suggest a short-term trade whenever structure gives one — never forced. It picks its own entry, stop and targets from market structure, swings, FVGs or another sound idea and names which; whatever it suggests is saved to the Short-term tab of the Suggested trades list. Off = no short-term suggestions."><input type="checkbox" id="tdd-friend-opt-shortterm" checked> AI trade suggestions (short-term)</label>
           <span class="tdd-friend-toggles-label" style="margin-left:auto;">AI provider:</span>
           <select id="tdd-friend-provider" class="tdd-friend-provider-select" title="Which provider to try first — still falls back through the others if it fails.">
             <option value="gemini" selected>Gemini (default)</option>
@@ -956,7 +957,9 @@
         <div class="tdd-trades" id="tdd-trades">
           <div class="tdd-trades-head">
             <span class="tdd-trades-title">Suggested trades</span>
-            <span class="tdd-trades-sub" id="tdd-trades-sub">saved automatically when the Trade map option is on</span>
+            <button class="tdd-btn small" id="tdd-trades-k-short" type="button">Short-term</button>
+            <button class="tdd-btn ghost small" id="tdd-trades-k-map" type="button">Trade map</button>
+            <span class="tdd-trades-sub" id="tdd-trades-sub">every long/short the AI suggests is saved here automatically</span>
             <button class="tdd-btn ghost small" id="tdd-trades-toggle" type="button" style="display:none;">Show all</button>
           </div>
           <div id="tdd-trades-list"><div class="tdd-trades-empty">Sign in to see your suggested trades.</div></div>
@@ -2267,7 +2270,7 @@
   // Fill in your own project's config (Firebase console → Project settings → General → Your apps → SDK setup).
   // This is a public client config, not a secret — real protection comes from the Realtime Database
   // security rules (see FIREBASE_SETUP.md), which restrict each account to its own "positions/<uid>" node.
- const firebaseConfig = {
+  const firebaseConfig = {
   apiKey: "AIzaSyAb2s0CBOVR8DBhlCVPJZpQ21XMZh_fIh0",
   authDomain: "trading-dashboard-be05e.firebaseapp.com",
   databaseURL: "https://trading-dashboard-be05e-default-rtdb.firebaseio.com",
@@ -2561,7 +2564,7 @@
 
 
   // --- suggested trades: the trade map's levels are saved on the assistant message (chats/<uid>/<id>/trade) ---
-  let suggestedTrades = [], tradesShowAll = false, tradesLoadSeq = 0;
+  let suggestedTrades = [], tradesShowAll = false, tradesLoadSeq = 0, tradesKind = 'short';
   function fmtNum(n) { return (n == null || isNaN(n)) ? 'n/a' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
   async function loadSuggestedTrades() {
     if (!currentUser || !db) return;
@@ -2570,7 +2573,9 @@
       const snap = await db.ref('chats/' + currentUser.uid).orderByChild('ts').limitToLast(600).once('value');
       if (seq !== tradesLoadSeq) return;
       const out = [];
-      snap.forEach(child => { const v = child.val(); if (v && v.trade && v.trade.dir) out.push({ id: child.key, ts: v.ts || 0, symbol: v.symbol || '', trade: v.trade }); });
+      snap.forEach(child => { const v = child.val(); if (!v) return;
+        if (v.trade && v.trade.dir) out.push({ id: child.key, kind: 'map', ts: v.ts || 0, symbol: v.symbol || '', trade: v.trade });
+        if (v.shortTrade && v.shortTrade.dir) out.push({ id: child.key + '-s', kind: 'short', ts: v.ts || 0, symbol: v.symbol || '', trade: v.shortTrade }); });
       out.sort((a, b) => b.ts - a.ts);
       suggestedTrades = out;
       renderSuggestedTrades();
@@ -2582,11 +2587,15 @@
     const list = $('#tdd-trades-list'), btn = $('#tdd-trades-toggle');
     if (!list) return;
     if (!currentUser) { list.innerHTML = '<div class="tdd-trades-empty">Sign in to see your suggested trades.</div>'; btn.style.display = 'none'; return; }
-    if (!suggestedTrades.length) { list.innerHTML = '<div class="tdd-trades-empty">No suggested trades yet — tick "Trade map" and ask for a trade idea; each long/short it suggests is saved here.</div>'; btn.style.display = 'none'; return; }
-    const shown = tradesShowAll ? suggestedTrades : suggestedTrades.slice(0, 5);
-    btn.style.display = suggestedTrades.length > 5 ? '' : 'none';
-    btn.textContent = tradesShowAll ? 'Show last 5' : 'Show all (' + suggestedTrades.length + ')';
-    $('#tdd-trades-sub').textContent = 'showing ' + shown.length + ' of ' + suggestedTrades.length + ' — click a row for details';
+    const nShort = suggestedTrades.filter(x => x.kind === 'short').length, nMap = suggestedTrades.length - nShort;
+    $('#tdd-trades-k-short').textContent = 'Short-term (' + nShort + ')'; $('#tdd-trades-k-map').textContent = 'Trade map (' + nMap + ')';
+    $('#tdd-trades-k-short').classList.toggle('ghost', tradesKind !== 'short'); $('#tdd-trades-k-map').classList.toggle('ghost', tradesKind !== 'map');
+    const all = suggestedTrades.filter(x => x.kind === tradesKind);
+    if (!all.length) { list.innerHTML = '<div class="tdd-trades-empty">' + (tradesKind === 'short' ? 'No short-term suggestions yet — ask for a trade idea; whatever the AI suggests is saved here (it is never forced to suggest one).' : 'No trade-map trades yet — tick "Trade map" and ask for a trade idea; each long/short it suggests is saved here.') + '</div>'; btn.style.display = 'none'; return; }
+    const shown = tradesShowAll ? all : all.slice(0, 5);
+    btn.style.display = all.length > 5 ? '' : 'none';
+    btn.textContent = tradesShowAll ? 'Show last 5' : 'Show all (' + all.length + ')';
+    $('#tdd-trades-sub').textContent = 'showing ' + shown.length + ' of ' + all.length + ' — click a row for details';
     list.innerHTML = shown.map(x => {
       const t = x.trade, d = new Date(x.ts);
       const t1 = (t.targets && t.targets[0]) || null;
@@ -2600,14 +2609,16 @@
         '<span class="tdd-trade-time">' + escHtml(d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })) + '</span>' +
         '<span class="tdd-trade-nums">entry ' + fmtNum(t.entry) + ' · stop ' + fmtNum(t.stop) + (t1 ? ' · T1 ' + fmtNum(t1.price) + (t1.rr != null ? ' (' + t1.rr + 'R)' : '') : '') + fee + '</span>' +
         '</div><div class="tdd-trade-detail">' +
-        'Entry: ' + escHtml(t.entryNote || '') + '<br>' +
+        'Entry: ' + escHtml(t.entryNote || '') + (t.source === 'ai' ? ' <i>(the AI\'s own levels, saved as it gave them)</i>' : t.source === 'map' ? ' <i>(computed 1H map — the AI gave no levels)</i>' : '') + '<br>' +
         'Price when suggested: ' + fmtNum(t.price) + (risk ? ' · risk ' + fmtNum(risk) + ' pts' : '') + '<br>' +
         (targets ? targets + '<br>' : '') +
-        'Verdict: ' + escHtml(t.verdict || '') + (t.fibNote ? '<br>Fib: ' + escHtml(t.fibNote) : '') +
+        (t.tooWide ? '<b style="color:var(--rust);">Stop too wide for a short-term trade</b><br>' : '') + 'Verdict: ' + escHtml(t.verdict || '') + (t.fibNote ? '<br>Fib: ' + escHtml(t.fibNote) : '') +
         '</div></div>';
     }).join('');
   }
   $('#tdd-trades-toggle').addEventListener('click', () => { tradesShowAll = !tradesShowAll; renderSuggestedTrades(); });
+  $('#tdd-trades-k-short').addEventListener('click', () => { tradesKind = 'short'; tradesShowAll = false; renderSuggestedTrades(); });
+  $('#tdd-trades-k-map').addEventListener('click', () => { tradesKind = 'map'; tradesShowAll = false; renderSuggestedTrades(); });
   $('#tdd-trades-list').addEventListener('click', (ev) => { const row = ev.target.closest('.tdd-trade'); if (row) row.classList.toggle('open'); });
 
   async function saveFriendExchange(userText, userTs, reply, replyTs, data) {
@@ -2615,7 +2626,7 @@
     try {
       const ref = db.ref('chats/' + currentUser.uid);
       await ref.push({ role: 'user', content: userText, ts: userTs, symbol: tvSymbol });
-      await ref.push(Object.assign({ role: 'assistant', content: reply, ts: replyTs, symbol: tvSymbol, provider: data.aiProvider || null, model: data.aiModel || null }, data.trade ? { trade: data.trade } : {}));
+      await ref.push(Object.assign({ role: 'assistant', content: reply, ts: replyTs, symbol: tvSymbol, provider: data.aiProvider || null, model: data.aiModel || null }, Object.assign({}, data.trade ? { trade: data.trade } : {}, data.shortTrade ? { shortTrade: data.shortTrade } : {})));
     } catch (e) {
       appendFriendMsg('error', "This exchange couldn't be saved to your history: " + (e.message || e) + ' — check the Firebase rules for "chats".');
     }
@@ -2647,7 +2658,8 @@
         extraSmc: $('#tdd-friend-opt-extrasmc').checked,
         tradeMap: $('#tdd-friend-opt-trademap').checked,
         weakSR: $('#tdd-friend-opt-weaksr').checked,
-        fib: $('#tdd-friend-opt-fib').checked
+        fib: $('#tdd-friend-opt-fib').checked,
+        shortTerm: $('#tdd-friend-opt-shortterm').checked
       };
       const preferredProvider = $('#tdd-friend-provider').value;
       const res = await fetch(TRADING_FRIEND_ENDPOINT, {
@@ -2668,7 +2680,7 @@
       appendFriendMsg('assistant', reply, modelTag, repliedAt);
       friendHistory.push({ role: 'assistant', content: reply });
       if (data.bias) { biasCache[biasKey(tvSymbol)] = { data: data.bias, at: Date.now() }; renderBiasBanner(data.bias); persistBias(tvSymbol, data.bias); computeVerdict(); }
-      saveFriendExchange(text, sentAt, reply, repliedAt, data).then(() => { if (data.trade) loadSuggestedTrades(); });
+      saveFriendExchange(text, sentAt, reply, repliedAt, data).then(() => { if (data.trade || data.shortTrade) loadSuggestedTrades(); });
     } catch (e) {
       removeFriendTyping();
       appendFriendMsg('error', 'Could not reach the trading friend backend. ' + (e.message || e));
@@ -2700,7 +2712,7 @@
 
 
   // remember the analysis tick-boxes between visits (Bigger-picture rule starts ticked)
-  const FRIEND_OPT_KEYS = ['structure', 'smc', 'volatility', 'bigpicture', 'confluence', 'm15', 'extrasmc', 'trademap', 'weaksr', 'fib'];
+  const FRIEND_OPT_KEYS = ['structure', 'smc', 'volatility', 'bigpicture', 'confluence', 'm15', 'extrasmc', 'trademap', 'weaksr', 'fib', 'shortterm'];
   try {
     const savedOpts = JSON.parse(localStorage.getItem('tdd_friend_opts') || 'null');
     if (savedOpts) FRIEND_OPT_KEYS.forEach(k => { const el = $('#tdd-friend-opt-' + k); if (el && typeof savedOpts[k] === 'boolean') el.checked = savedOpts[k]; });
@@ -2714,7 +2726,8 @@
     return {
       structure: $('#tdd-friend-opt-structure').checked, smc: $('#tdd-friend-opt-smc').checked, volatility: $('#tdd-friend-opt-volatility').checked,
       bigPicture: $('#tdd-friend-opt-bigpicture').checked, confluence: $('#tdd-friend-opt-confluence').checked, m15: $('#tdd-friend-opt-m15').checked,
-      extraSmc: $('#tdd-friend-opt-extrasmc').checked, tradeMap: $('#tdd-friend-opt-trademap').checked, weakSR: $('#tdd-friend-opt-weaksr').checked, fib: $('#tdd-friend-opt-fib').checked
+      extraSmc: $('#tdd-friend-opt-extrasmc').checked, tradeMap: $('#tdd-friend-opt-trademap').checked, weakSR: $('#tdd-friend-opt-weaksr').checked, fib: $('#tdd-friend-opt-fib').checked,
+      shortTerm: $('#tdd-friend-opt-shortterm').checked
     };
   }
   async function copyTextToClipboard(text) {
