@@ -1155,6 +1155,16 @@
         </div>
       </div>
       <div class="tdd-verdict v-red" id="tdd-capital-lock" style="display:none;"></div>
+      <div class="tdd-plan" id="tdd-conf" style="margin-bottom:12px; display:none;">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;">
+          <div class="tdd-pnl-title" style="margin:0;">Confluence</div>
+          <div id="tdd-conf-pct" style="font-size:26px; font-weight:700; font-family:'IBM Plex Mono', monospace;"></div>
+          <div id="tdd-conf-label" class="tdd-pnl-note" style="margin:0;"></div>
+        </div>
+        <div style="height:8px; background:var(--border); border-radius:4px; margin:8px 0;"><div id="tdd-conf-bar" style="height:100%; width:0; border-radius:4px; transition:width .3s;"></div></div>
+        <div id="tdd-conf-list" style="font-size:12.5px; line-height:1.55;"></div>
+        <div class="tdd-pnl-note" id="tdd-conf-note" style="margin-top:6px;"></div>
+      </div>
       <div class="tdd-verdict v-green" id="tdd-verdict"></div>
 
       <div id="tdd-editing-banner" style="display:none; margin-bottom:10px; padding:10px 14px; border:1px solid var(--amber); border-radius:4px; color:var(--amber); font-size:13px;">Editing an existing trade — saving will update this entry instead of creating a new one.</div>
@@ -3086,6 +3096,77 @@
   $('#cap-save').addEventListener('click', saveCapital);
   setInterval(() => { renderCapitalLockBanner(); renderCapbox(); if ($('#panel-capital').classList.contains('active')) renderCapitalPanel(); }, 20000);
 
+  // --- entry confluence: how much of the trade's own checklist lines up, as a percent of 100 ---
+  // Market checks come from the Worker (checked against the entry price you type); the self-reported ones are scored here.
+  const CONF_STRONG = 70, CONF_LOW = 50; // percent bands: at or above STRONG = strong, below LOW = weak
+  let confServer = { key: '', items: null, err: '', loading: false }, confTimer = null, confSeq = 0;
+  function confLive() { return !editingId && $('#f-outcome').value === 'open'; }
+  function confKey() { return [$('#f-symbol').value.trim().toUpperCase(), $('#f-direction').value, $('#f-entry').value, $('#f-sl').value, $('#f-target').value].join('|'); }
+  function confClientItems() {
+    const out = [];
+    const daily = $('input[name="f-daily"]:checked').value === 'yes';
+    out.push({ id: 'c-daily', name: 'Daily timeframe analysed (your answer)', weight: 5, status: daily ? 'pass' : 'fail', detail: daily ? 'you confirmed the daily was read before entering' : 'you answered No — read the daily first', client: true });
+    const closed = $('input[name="f-candleclosed"]:checked').value === 'yes';
+    out.push({ id: 'c-closed', name: 'Signal candle fully closed (your answer)', weight: 4, status: closed ? 'pass' : 'fail', detail: closed ? 'you confirmed the candle has closed' : 'you are entering before the candle closes', client: true });
+    const marks = ['#f-mark-support', '#f-mark-resistance', '#f-mark-trendline'].filter(id => $(id).checked).length;
+    out.push({ id: 'c-marks', name: 'Support, resistance and trendline marked (your answer)', weight: 6, status: marks === 3 ? 'pass' : marks > 0 ? 'partial' : 'fail', detail: marks + ' of 3 marked on your chart', client: true });
+    return out;
+  }
+  function confSummary() {
+    if (!confLive()) return null;
+    const symDir = k => k.split('|').slice(0, 2).join('|');
+    const srv = confServer.items && symDir(confServer.key) === symDir(confKey()) ? confServer.items : null; // ignore market checks left over from another symbol/direction
+    const items = (srv || []).concat(confClientItems());
+    let num = 0, den = 0;
+    items.forEach(it => {
+      if (it.status === 'na') return;
+      if (it.bonus && it.status !== 'pass') return;
+      den += it.weight; num += it.weight * (it.status === 'pass' ? 1 : it.status === 'partial' ? 0.5 : 0);
+    });
+    return { pct: den ? Math.round(num / den * 100) : null, items, missing: items.filter(i => i.status === 'fail' && !i.bonus).map(i => i.name), market: !!srv };
+  }
+  function renderConfluence() {
+    const box = $('#tdd-conf'); if (!box) return;
+    const c = confSummary();
+    if (!c) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    const col = c.pct == null ? 'var(--text-faint)' : c.pct >= CONF_STRONG ? 'var(--candle-green)' : c.pct >= CONF_LOW ? 'var(--amber)' : 'var(--rust)';
+    $('#tdd-conf-pct').textContent = c.pct == null ? '—' : c.pct + '%'; $('#tdd-conf-pct').style.color = col;
+    $('#tdd-conf-bar').style.width = (c.pct || 0) + '%'; $('#tdd-conf-bar').style.background = col;
+    $('#tdd-conf-label').textContent = c.pct == null ? 'nothing to score yet' : c.pct >= CONF_STRONG ? 'strong confluence' : c.pct >= CONF_LOW ? 'moderate — look at what is missing' : 'weak — most of your conditions are missing';
+    const icon = { pass: ['✓', 'var(--candle-green)'], partial: ['◐', 'var(--amber)'], fail: ['✗', 'var(--rust)'], na: ['–', 'var(--text-faint)'] };
+    const order = { fail: 0, partial: 1, pass: 2, na: 3 };
+    $('#tdd-conf-list').innerHTML = c.items.slice().sort((a, b) => order[a.status] - order[b.status]).map(it => {
+      const ic = icon[it.status];
+      return '<div style="margin-bottom:3px;"><span style="color:' + ic[1] + '; font-weight:700; display:inline-block; width:16px;">' + ic[0] + '</span><b>' + escHtml(it.name) + '</b> <span class="tdd-pnl-note" style="margin:0;">(weight ' + it.weight + (it.bonus ? ', bonus' : '') + ')</span><br><span style="color:var(--text-dim); margin-left:16px;">' + escHtml(it.detail || '') + '</span></div>';
+    }).join('');
+    let note = '';
+    if (confServer.loading) note = 'Updating the market checks…';
+    else if (confServer.err) note = 'Market checks unavailable: ' + confServer.err + ' — the percent below uses only your own answers.';
+    else if (!c.market) note = 'Fill in the symbol and direction to run the market checks (FVG, 4H momentum, bias, candle, Fibonacci…). Until then the percent uses only your own answers.';
+    else note = 'Scored against the entry price you typed. Pass = full weight, partial = half. Not scored: items marked –.';
+    $('#tdd-conf-note').textContent = note;
+  }
+  async function fetchConfluence() {
+    const key = confKey(), seq = ++confSeq;
+    const sym = $('#f-symbol').value.trim();
+    if (!confLive() || !sym || !currentUser || !isFriendAdmin() || !TRADING_FRIEND_ENDPOINT || TRADING_FRIEND_ENDPOINT.indexOf('YOUR-WORKER-SUBDOMAIN') !== -1) { confServer = { key, items: null, err: (!sym ? '' : (currentUser && isFriendAdmin()) ? 'Trading friend is not connected' : 'sign in as the admin'), loading: false }; renderConfluence(); computeVerdict(); return; }
+    confServer.loading = true; renderConfluence();
+    try {
+      const idToken = await currentUser.getIdToken();
+      const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? null : v; };
+      const res = await fetch(TRADING_FRIEND_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: idToken, symbol: sym, confluenceCheck: true, dir: $('#f-direction').value === 'Short' ? 'short' : 'long', entry: num('#f-entry'), stop: num('#f-sl'), target: num('#f-target') }) });
+      let data = {}; try { data = await res.json(); } catch (e) {}
+      if (seq !== confSeq) return;
+      if (res.ok && data.confluence && data.confluence.items) confServer = { key, items: data.confluence.items, err: '', loading: false };
+      else confServer = { key, items: null, err: data.error || ('HTTP ' + res.status) + ' (deploy the latest Worker)', loading: false };
+    } catch (e) { if (seq !== confSeq) return; confServer = { key, items: null, err: String(e.message || e), loading: false }; }
+    renderConfluence(); computeVerdict();
+  }
+  function scheduleConfluence() { clearTimeout(confTimer); confTimer = setTimeout(fetchConfluence, 700); }
+  ['#f-symbol', '#f-entry', '#f-sl', '#f-target'].forEach(sel => $(sel).addEventListener('input', scheduleConfluence));
+  ['#f-symbol', '#f-direction', '#f-outcome'].forEach(sel => $(sel).addEventListener('change', scheduleConfluence));
+
   function computeVerdict() {
     const sl = $('#f-sl').value;
     const target = $('#f-target').value;
@@ -3139,6 +3220,9 @@
       const lr = $('#f-loc-row'); if (lr) lr.style.display = loc.reds.length ? 'block' : 'none';
       const cap = capitalCheck();
       cap.reds.forEach(x => reds.push(x)); cap.ambers.forEach(x => ambers.push(x));
+      const cf = confSummary();
+      if (cf && cf.pct != null && cf.pct < CONF_LOW) ambers.push('Low confluence: ' + cf.pct + '% of 100 — missing: ' + cf.missing.slice(0, 4).join('; ') + (cf.missing.length > 4 ? '; …' : '') + '.');
+      renderConfluence();
       const br = $('#f-budget-row'); if (br) br.style.display = cap.breach ? 'block' : 'none';
       const hr = $('#f-size-hint-row'); if (hr) { hr.style.display = cap.hint ? 'block' : 'none'; $('#f-size-hint').innerHTML = cap.hint; }
       renderCapitalLockBanner();
@@ -3217,6 +3301,8 @@
       if (!editingId && bb) { entry.biasDaily = bb.daily ? bb.daily.status : ''; entry.biasWeekly = bb.weekly ? bb.weekly.status : ''; }
     }
     if (!editingId && $('#f-outcome').value === 'open') {
+      const cs = confSummary();
+      if (cs && cs.pct != null) { entry.confluencePct = cs.pct; entry.confluenceMiss = cs.missing.join('; ').slice(0, 300); entry.confluenceMarket = cs.market; }
       const cg = capitalCheck();
       if (cg.breach) { entry.budgetFlag = cg.reds[0].replace(/^Capital guard: /, '').slice(0, 300); entry.budgetReason = $('#f-budget-reason').value.trim(); }
       const lc = currentLocationCheck();
@@ -3835,7 +3921,7 @@
         (e.rangeCheck || e.chartPattern || e.reversalTrendCheck ? '<div class="when" style="margin-top:2px;">' + (e.rangeCheck ? 'range check: ' + rangeCheckLabel(e.rangeCheck) : '') + (e.rangeCheck && (e.chartPattern || e.reversalTrendCheck) ? ' · ' : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' ? 'reversal trend: ' + reversalTrendCheckLabel(e.reversalTrendCheck) : '') + (e.reversalTrendCheck && e.reversalTrendCheck !== 'na' && e.chartPattern ? ' · ' : '') + (e.chartPattern ? 'pattern: ' + chartPatternLabel(e.chartPattern) : '') + '</div>' : '') +
         (e.candleClosed === 'no' || e.goodLevel === 'no' ? '<div class="when" style="margin-top:2px; color:var(--rust);">' + (e.candleClosed === 'no' ? 'entered before candle closed' : '') + (e.candleClosed === 'no' && e.goodLevel === 'no' ? ' · ' : '') + (e.goodLevel === 'no' ? 'weak/unproven level' : '') + '</div>' : '') +
         (e.mistakes.length ? '<div class="tdd-pill-row">' + e.mistakes.map(m => '<span class="tdd-pill">' + m + '</span>').join('') + '</div>' : '') +
-        (e.budgetFlag ? '<div class="when" style="margin-top:2px; color:var(--rust);">⚠ over budget at entry: ' + escHtml(e.budgetFlag) + (e.budgetReason ? ' — your reason: ' + escHtml(e.budgetReason) : '') + '</div>' : '') + (e.locationFlag ? '<div class="when" style="margin-top:2px; color:var(--rust);">⚠ location flag at entry: ' + escHtml(e.locationFlag) + (e.locationReason ? ' — your reason: ' + escHtml(e.locationReason) : '') + '</div>' : '') +
+        (e.confluencePct != null ? '<div class="when" style="margin-top:2px;">confluence at entry: ' + escHtml(e.confluencePct) + '%' + (e.confluenceMarket === false ? ' (your own answers only)' : '') + (e.confluenceMiss ? ' — missing: ' + escHtml(e.confluenceMiss) : '') + '</div>' : '') + (e.budgetFlag ? '<div class="when" style="margin-top:2px; color:var(--rust);">⚠ over budget at entry: ' + escHtml(e.budgetFlag) + (e.budgetReason ? ' — your reason: ' + escHtml(e.budgetReason) : '') + '</div>' : '') + (e.locationFlag ? '<div class="when" style="margin-top:2px; color:var(--rust);">⚠ location flag at entry: ' + escHtml(e.locationFlag) + (e.locationReason ? ' — your reason: ' + escHtml(e.locationReason) : '') + '</div>' : '') +
         (e.planB ? '<div class="note"><b>Plan B:</b> ' + escHtml(e.planB) + '</div>' : '') +
         (e.notes ? '<div class="note">' + e.notes + '</div>' : '') +
         (e.referenceImage ? '<div class="tdd-entry-ref"><img class="tdd-ref-zoom" src="' + e.referenceImage + '" alt="reference chart"></div>' : '') +
